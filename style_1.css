@@ -70,6 +70,15 @@ header {
     background-color: #f1f1f1;
 }
 
+.message.bot .content {
+    display: flex;
+    align-items: center;
+}
+
+.message.bot img {
+    margin-right: 10px;
+}
+
 footer {
     display: flex;
     align-items: center;
@@ -95,5 +104,19 @@ footer {
 }
 
 #sendButton:hover {
+    background-color: #c70039;
+}
+
+.graph-button, .sql-button, .share-button {
+    margin-top: 10px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: maroon;
+    color: white;
+    cursor: pointer;
+}
+
+.graph-button:hover, .sql-button:hover, .share-button:hover {
     background-color: #c70039;
 }
