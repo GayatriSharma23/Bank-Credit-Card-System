@@ -1,68 +1,27 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>S.A.G.E</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.5.0/css/all.css" integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU" crossorigin="anonymous">
-    <link rel="stylesheet" type="text/css" href="static/style.css"/>
-    <link rel="stylesheet" type="text/css" href="static/animate.css"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insights Hub</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="main.js"></script>
 </head>
 <body>
-    <div class="container-fluid h-100">
-        <div class="row justify-content-center h-100">		
-            <div class="col-md-4 chat">
-                <div class="card">
-                    <div class="card-header msg_head">
-                        <div class="d-flex bd-highlight">
-                            <div class="img_cont">
-                                <img src="static/sage.png" class="rounded-circle user_img">
-                            </div>
-                            <div class="header">
-                                <span>S.A.G.E</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="messageFormeight" class="card-body msg_card_body">
-                    </div>
-                    <div class="card-footer">
-                        <form id="messageArea" class="input-group">
-                            <input type="text" id="text" name="msg" placeholder="Type your message..." autocomplete="off" class="form-control type_msg" required/>
-                            <div class="input-group-append">
-                                <button type="submit" id="send" class="input-group-text send_btn"><i class="fas fa-location-arrow"></i></button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-                <div class="card mt-2">
-                    <div class="card-body">
-                        <button id="showSQL" class="btn btn-primary btn-block">Show SQL Query</button>
-                        <button id="showVisual" class="btn btn-secondary btn-block">Show Visual</button>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 history">
-                <div class="card">
-                    <div class="card-header">
-                        <span>Chat History</span>
-                    </div>
-                    <div class="card-body">
-                        <ul id="chatHistory" class="list-unstyled"></ul>
-                    </div>
-                </div>
-            </div>
+    <div class="chat-container">
+        <header>
+            <h1>AGENT</h1>
+        </header>
+        <div class="button-container">
+            <button id="newChatButton">+ New Chat</button>
+            <button id="chatHistoryButton">Chat History</button>
         </div>
-    </div>  
-
-    <div id="overlay" class="overlay">
-        <div class="overlay-content">
-            <span class="closebtn" onclick="closeOverlay()">&times;</span>
-            <div id="overlayContent"></div>
-        </div>
+        <div class="messages"></div>
+        <footer>
+            <input type="text" id="data" placeholder="Type your query here...">
+            <button id="sendButton">Send</button>
+        </footer>
     </div>
-
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-    <script src="static/main.js"></script>
 </body>
 </html>
