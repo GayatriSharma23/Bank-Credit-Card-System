@@ -1,67 +1,46 @@
-$(document).ready(function() {
-    // Function to submit user message
-    $("#messageArea").on("submit", function(event) {
-        event.preventDefault(); // Prevent default form submission
+$(document).ready(function () {
+    $("#sendButton").on("click", function () {
+        var userInput = $("#data").val();
+        if (userInput.trim() !== "") {
+            var userMessage = $("<div>").addClass("message user").text(userInput);
+            $(".messages").append(userMessage);
+            $("#data").val("");
 
-        const date = new Date();
-        const hour = date.getHours();
-        const minute = (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
-        const str_time = hour + ":" + minute;
+            $.ajax({
+                type: "POST",
+                url: "/get",
+                data: { msg: userInput },
+                success: function (response) {
+                    var botMessage = $("<div>").addClass("message bot");
+                    var botContent = $("<div>").addClass("content");
+                    var laptopLogo = $("<img>").attr("src", "laptop.png").attr("alt", "Laptop Logo").css({ width: "20px", height: "20px" });
+                    var botText = $("<span>").text(response.answer);
 
-        var rawText = $("#text").val();
-        var userHtml = '<div class="d-flex justify-content-end mb-4"><div class="msg_container_send"><p id="h7">' + rawText + '</p><span class="msg_time_send">' + str_time + '</span></div></div>';
-        $("#text").val("");
-        $("#messageFormeight").append(userHtml);
-        $("#messageFormeight").animate({ scrollTop: $("#messageFormeight")[0].scrollHeight }, "slow");
+                    botContent.append(laptopLogo).append(botText);
+                    botMessage.append(botContent);
+                    $(".messages").append(botMessage);
 
-        var loadingHTML = '<div class="d-flex justify-content-start mb-4"><div class="typing-indicator" id="typing"><span></span><span></span><span></span></div></div>';
-        $("#messageFormeight").append($.parseHTML(loadingHTML));
+                    if (response.valid) {
+                        var graphButton = $("<button>").text("Click to view graph.").addClass("graph-button").on("click", function () {
+                            // Logic to display the graph
+                            alert("Displaying the graph...");
+                        });
+                        var sqlButton = $("<button>").text("Show SQL").addClass("sql-button").on("click", function () {
+                            alert("SQL Query: " + response.sql_query);
+                        });
+                        var shareButton = $("<button>").text("Share").addClass("share-button").on("click", function () {
+                            // Logic to share the message
+                            alert("Sharing the message...");
+                        });
 
-        $.ajax({
-            data: { msg: rawText },
-            type: "POST",
-            url: "/get",
-        }).done(function(data) {
-            const date_done = new Date();
-            const hour_done = date_done.getHours();
-            const minute_done = (date_done.getMinutes() < 10 ? '0' : '') + date_done.getMinutes();
-            const str_time_done = hour_done + ":" + minute_done;
-
-            $("#typing").remove();
-            var botHtml = '<div class="d-flex justify-content-start mb-4"><div class="msg_container"><p id="h7_send">' + data + '</p><span class="msg_time">' + str_time_done + '</span></div></div>';
-            $("#messageFormeight").append(botHtml);
-            $("#messageFormeight").animate({ scrollTop: $("#messageFormeight")[0].scrollHeight }, "slow");
-        });
-    });
-
-    // Show SQL Query button event
-    $("#showSQL").on("click", function() {
-        $.ajax({
-            type: "GET",
-            url: "/sql",
-        }).done(function(data) {
-            showOverlay(data);
-        });
-    });
-
-    // Show Visual button event
-    $("#showVisual").on("click", function() {
-        $.ajax({
-            type: "GET",
-            url: "/visual",
-        }).done(function(data) {
-            showOverlay(data);
-        });
+                        $(".messages").append(graphButton).append(sqlButton).append(shareButton);
+                    }
+                },
+                error: function () {
+                    var botMessage = $("<div>").addClass("message bot").text("Error in processing your request. Please try again.");
+                    $(".messages").append(botMessage);
+                }
+            });
+        }
     });
 });
-
-// Function to show overlay with content
-function showOverlay(content) {
-    $("#overlayContent").html(content);
-    $("#overlay").show();
-}
-
-// Function to close overlay
-function closeOverlay() {
-    $("#overlay").hide();
-}
