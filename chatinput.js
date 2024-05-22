@@ -4,8 +4,10 @@ const ChatInput = ({ onSendMessage }) => {
   const [input, setInput] = useState('');
 
   const handleSend = () => {
-    onSendMessage(input);
-    setInput('');
+    if (input.trim()) {
+      onSendMessage(input);
+      setInput('');
+    }
   };
 
   return (
@@ -16,7 +18,7 @@ const ChatInput = ({ onSendMessage }) => {
         onChange={(e) => setInput(e.target.value)}
         placeholder="Type your query here..."
       />
-      <button onClick={handleSend}>Send</button>
+      <button onClick={handleSend}></button>
     </div>
   );
 };
