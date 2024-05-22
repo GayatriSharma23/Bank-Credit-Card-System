@@ -1,7 +1,7 @@
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 90vh;  /* Reduced the height a bit */
   padding: 20px;
   max-width: 400px;
   margin: auto;
@@ -14,7 +14,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;  /* Reduced the bottom margin */
 }
 
 .app-title {
@@ -48,7 +48,7 @@
   overflow-y: auto;
   border: 1px solid #ccc;
   padding: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;  /* Reduced the bottom margin */
 }
 
 .message, .history-message {
@@ -130,3 +130,4 @@
     opacity: 0;
   }
 }
+
