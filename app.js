@@ -14,14 +14,14 @@ const App = () => {
   };
 
   const handleSendMessage = async (message) => {
-    const response = await fetch('/api/chat', {
+    const response = await fetch('/get', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ msg: message }),
     });
-    const data = await response.json();
-    setMessages([...messages, { user: message, bot: data.response }]);
-    setHistory([...history, { user: message, bot: data.response }]);
+    const data = await response.text();  // Assuming the response is plain text
+    setMessages([...messages, { user: message, bot: data }]);
+    setHistory([...history, { user: message, bot: data }]);
   };
 
   const handleShowHistory = () => {
@@ -31,8 +31,8 @@ const App = () => {
   return (
     <div className="app">
       <div className="header">
-        <button onClick={handleNewChat}>New Chat</button>
-        <button onClick={handleShowHistory}>Chat History</button>
+        <button className="new-chat-button" onClick={handleNewChat}>New Chat</button>
+        <button className="history-button" onClick={handleShowHistory}>Chat History</button>
       </div>
       {showHistory ? (
         <ChatHistory history={history} />
