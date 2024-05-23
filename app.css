@@ -25,6 +25,7 @@ body {
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
+  border: 2px solid black; /* Thicker black border */
 }
 
 .header {
@@ -32,7 +33,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 20px;
-  background: linear-gradient(135deg, #ff6f61, #d7435e);
+  background: maroon; /* Maroon gradient background */
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
 }
@@ -49,6 +50,7 @@ body {
   display: flex;
   justify-content: center;
   width: 100%;
+  margin-bottom: 20px; /* Space below the buttons */
 }
 
 .new-chat-button,
@@ -77,22 +79,8 @@ body {
   padding: 10px;
   border-radius: 20px;
   background: url('/background-image.jpg') no-repeat center;
-  background-size: contain;
-  position: relative;
-}
-
-.chat::before, .chat-history::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100px;
-  height: 100px;
-  background: url('/laptop-icon.png') no-repeat center center;
   background-size: cover;
-  opacity: 0.1;
-  transform: translate(-50%, -50%);
-  z-index: 1;
+  position: relative;
 }
 
 .message, .history-message {
@@ -122,6 +110,20 @@ body {
   background: rgba(255, 255, 255, 0.8);
   border-radius: 10px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.bot::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  width: 30px;
+  height: 30px;
+  background: url('/laptop-icon.png') no-repeat center center;
+  background-size: contain;
+  border-radius: 50%;
+  opacity: 0.5; /* Slightly translucent */
 }
 
 .user, .bot {
@@ -131,7 +133,7 @@ body {
 .chat-input {
   display: flex;
   padding: 10px;
-  background: #f9f9f9;
+  background: maroon; /* Maroon background for input area */
   border-top: 1px solid #eee;
   border-radius: 0 0 20px 20px;
 }
@@ -162,6 +164,7 @@ body {
 .chat-input button::after {
   content: '➤';
   font-size: 1.2em;
+  display: block;
 }
 
 .loading-dots {
