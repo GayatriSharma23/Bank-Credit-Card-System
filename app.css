@@ -24,6 +24,7 @@ body {
   border-radius: 20px;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+  position: relative;
 }
 
 .header {
@@ -74,16 +75,32 @@ body {
   flex-grow: 1;
   overflow-y: auto;
   padding: 10px;
-  position: relative;
-  background: url('/background-image.jpg') no-repeat center center;
-  background-size: cover;
   border-radius: 20px;
+  background: url('/background-image.jpg') no-repeat center;
+  background-size: contain;
+  position: relative;
+}
+
+.chat::before, .chat-history::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 100px;
+  background: url('/laptop-icon.png') no-repeat center center;
+  background-size: cover;
+  opacity: 0.1;
+  transform: translate(-50%, -50%);
+  z-index: 1;
 }
 
 .message, .history-message {
   display: flex;
   align-items: center;
   margin-bottom: 10px;
+  position: relative;
+  z-index: 2;
 }
 
 .user {
