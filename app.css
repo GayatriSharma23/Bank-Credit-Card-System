@@ -1,9 +1,4 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
+/* General Styles */
 body {
   background: linear-gradient(135deg, #ececec, #e6e6e6);
   font-family: 'Arial', sans-serif;
@@ -33,7 +28,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 20px;
-  background: #b56565; /* Light maroon background for title only */
+  background: rgba(156, 42, 42, 0.8); /* Light maroon background for title only */
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
 }
@@ -60,7 +55,7 @@ body {
   font-size: 1em;
   color: white;
   font-weight: bold;
-  background-color: #b56565; /* Light maroon color */
+  background-color: rgba(156, 42, 42, 0.8); /* Light maroon color */
   border: none;
   border-radius: 20px;
   cursor: pointer;
@@ -70,7 +65,7 @@ body {
 
 .new-chat-button:hover,
 .history-button:hover {
-  background-color: #a04f4f;
+  background-color: rgba(136, 32, 32, 0.8);
 }
 
 .chat, .chat-history {
@@ -107,23 +102,20 @@ body {
   position: relative;
 }
 
-.bot::after {
-  content: '';
-  position: absolute;
-  bottom: -10px;
-  right: -10px;
-  width: 20px;
-  height: 20px;
+.bot-logo {
+  width: 15px; /* Reduced size */
+  height: 15px; /* Reduced size */
   background: url('/laptop-icon.png') no-repeat center center;
   background-size: contain;
   border-radius: 50%;
-  opacity: 0.8; /* Slightly translucent */
+  margin-left: 5px;
+  opacity: 0.5; /* Translucent */
 }
 
 .chat-input {
   display: flex;
   padding: 10px;
-  background: #b56565; /* Light maroon background for input area */
+  background: rgba(156, 42, 42, 0.8); /* Light maroon background for input area */
   border-top: 1px solid #eee;
   border-radius: 0 0 20px 20px;
 }
@@ -141,14 +133,14 @@ body {
   padding: 15px;
   border: none;
   background-color: white;
-  color: #b56565; /* Light maroon color for send button */
+  color: rgba(156, 42, 42, 0.8); /* Light maroon color for send button */
   border-radius: 50%;
   cursor: pointer;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .chat-input button:hover {
-  background-color: #b56565;
+  background-color: rgba(156, 42, 42, 0.8);
   color: white;
 }
 
@@ -163,7 +155,7 @@ body {
   justify-content: center;
   align-items: center;
   font-size: 1.5em;
-  color: #b56565; /* Light maroon color */
+  color: rgba(156, 42, 42, 0.8); /* Light maroon color */
   animation: blink 1.4s infinite both;
 }
 
