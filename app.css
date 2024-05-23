@@ -33,7 +33,7 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 20px;
-  background: maroon; /* Maroon background for title only */
+  background: #b56565; /* Light maroon background for title only */
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
 }
@@ -43,16 +43,14 @@ body {
   color: #ffffff;
   font-weight: bold;
   text-align: center;
-  margin-bottom: 20px;
 }
 
 .buttons {
   display: flex;
   justify-content: center;
   width: 100%;
-  background: #ffffff; /* No maroon background here */
   padding: 10px 0;
-  border-top: 1px solid #eee;
+  background: #ffffff; /* No maroon background here */
 }
 
 .new-chat-button,
@@ -62,7 +60,7 @@ body {
   font-size: 1em;
   color: white;
   font-weight: bold;
-  background-color: maroon;
+  background-color: #b56565; /* Light maroon color */
   border: none;
   border-radius: 20px;
   cursor: pointer;
@@ -72,7 +70,7 @@ body {
 
 .new-chat-button:hover,
 .history-button:hover {
-  background-color: darkred;
+  background-color: #a04f4f;
 }
 
 .chat, .chat-history {
@@ -90,27 +88,22 @@ body {
   margin-bottom: 10px;
   position: relative;
   z-index: 2;
+  background: #f0f0f0; /* Grey background for message bubbles */
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  color: black;
 }
 
 .user {
   font-weight: bold;
   margin-right: auto;
-  color: #333;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .bot {
   margin-left: auto;
   display: flex;
   align-items: center;
-  color: #333;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   position: relative;
 }
 
@@ -119,22 +112,18 @@ body {
   position: absolute;
   bottom: -10px;
   right: -10px;
-  width: 30px;
-  height: 30px;
+  width: 20px;
+  height: 20px;
   background: url('/laptop-icon.png') no-repeat center center;
   background-size: contain;
   border-radius: 50%;
-  opacity: 0.5; /* Slightly translucent */
-}
-
-.user, .bot {
-  max-width: 70%;
+  opacity: 0.8; /* Slightly translucent */
 }
 
 .chat-input {
   display: flex;
   padding: 10px;
-  background: white; /* White background for input area */
+  background: #b56565; /* Light maroon background for input area */
   border-top: 1px solid #eee;
   border-radius: 0 0 20px 20px;
 }
@@ -152,14 +141,14 @@ body {
   padding: 15px;
   border: none;
   background-color: white;
-  color: maroon;
+  color: #b56565; /* Light maroon color for send button */
   border-radius: 50%;
   cursor: pointer;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .chat-input button:hover {
-  background-color: maroon;
+  background-color: #b56565;
   color: white;
 }
 
@@ -174,7 +163,7 @@ body {
   justify-content: center;
   align-items: center;
   font-size: 1.5em;
-  color: maroon;
+  color: #b56565; /* Light maroon color */
   animation: blink 1.4s infinite both;
 }
 
