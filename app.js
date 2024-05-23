@@ -35,8 +35,10 @@ const App = () => {
     <div className="app">
       <div className="header">
         <h1 className="app-title">PIA</h1>
-        <button className="new-chat-button" onClick={handleNewChat}>+New Chat</button>
-        <button className="history-button" onClick={handleShowHistory}>Chat History</button>
+        <div className="buttons">
+          <button className="new-chat-button" onClick={handleNewChat}>+ New Chat</button>
+          <button className="history-button" onClick={handleShowHistory}>Chat History</button>
+        </div>
       </div>
       {showHistory ? (
         <ChatHistory history={history} />
