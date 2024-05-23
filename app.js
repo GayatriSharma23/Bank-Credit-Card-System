@@ -21,7 +21,7 @@ const App = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ msg: message }),
     });
-    const data = await response.text();  // Assuming the response is plain text
+    const data = await response.text(); // Assuming the response is plain text
     setMessages([...messages, { user: message, bot: data }]);
     setHistory([...history, { user: message, bot: data }]);
     setLoading(false);
@@ -35,10 +35,10 @@ const App = () => {
     <div className="app">
       <div className="header">
         <h1 className="app-title">PIA</h1>
-        <div className="buttons">
-          <button className="new-chat-button" onClick={handleNewChat}>+ New Chat</button>
-          <button className="history-button" onClick={handleShowHistory}>Chat History</button>
-        </div>
+      </div>
+      <div className="buttons">
+        <button className="new-chat-button" onClick={handleNewChat}>+ New Chat</button>
+        <button className="history-button" onClick={handleShowHistory}>Chat History</button>
       </div>
       {showHistory ? (
         <ChatHistory history={history} />
