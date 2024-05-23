@@ -8,7 +8,7 @@ const Chat = ({ messages, loading }) => {
           <div className="user">{msg.user}</div>
           <div className="bot">
             {msg.bot}
-            <img src="laptop-icon.png" alt="Laptop" className="laptop-icon" />
+            <img src="/laptop-icon.png" alt="Laptop" className="laptop-icon" />
           </div>
         </div>
       ))}
