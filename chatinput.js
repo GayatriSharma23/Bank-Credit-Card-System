@@ -10,12 +10,19 @@ const ChatInput = ({ onSendMessage }) => {
     }
   };
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSend();
+    }
+  };
+
   return (
     <div className="chat-input">
       <input
         type="text"
         value={input}
         onChange={(e) => setInput(e.target.value)}
+        onKeyPress={handleKeyPress}
         placeholder="Type your query here..."
       />
       <button onClick={handleSend}></button>
