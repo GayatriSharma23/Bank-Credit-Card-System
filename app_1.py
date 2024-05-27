@@ -41,15 +41,18 @@ def generate_response(query):
         print(e)
         print("We are having trouble understanding your request. Please try rephrasing or contact BI Team for further assistance.")
 
-@app.route("/get", methods=["POST"])
+@app.route("/api/chat", methods=["POST"])
 def chat():
-    data = request.json
-    msg = data.get("msg")
-    response = get_chat_response(msg)
-    if response:
-        return jsonify(response=response)
+    if request.is_json:
+        data = request.get_json()
+        msg = data.get("msg")
+        response = get_chat_response(msg)
+        if response:
+            return jsonify(response=response)
+        else:
+            return jsonify(response='Please try rephrasing or contact BI Team for further assistance.')
     else:
-        return jsonify(response='Please try rephrasing or contact BI Team for further assistance.')
+        return jsonify(error="Unsupported Media Type: Use 'Content-Type: application/json'"), 415
 
 def get_chat_response(input):
     try:
