@@ -1,11 +1,13 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import logging
 from response_generate import *
 from langchain_community.llms import Ollama
 from langchain.memory import ConversationBufferMemory
 
 app = Flask(__name__)
 CORS(app)
+logging.basicConfig(level=logging.DEBUG)
 
 memory = ConversationBufferMemory(memory_key="chat_history",
                                   input_key='query', output_key='result',
@@ -43,6 +45,9 @@ def generate_response(query):
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
+    app.logger.debug('Request Headers: %s', request.headers)
+    app.logger.debug('Request Body: %s', request.get_data())
+
     if request.is_json:
         data = request.get_json()
         msg = data.get("msg")
