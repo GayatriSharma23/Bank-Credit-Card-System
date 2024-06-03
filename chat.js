@@ -4,9 +4,21 @@ const Chat = ({ messages, loading }) => {
   return (
     <div className="chat">
       {messages.map((msg, index) => (
-        <div key={index} className="message">
-          <div className="user">{msg.user}</div>
-          <div className="bot">{msg.bot}</div>
+        <div key={index} className={msg.type}>
+          <div className="message">
+            {msg.type === 'user' && (
+              <div className="user-message">
+                <div className="user-icon">U</div>
+                <div className="user-content">{msg.content}</div>
+              </div>
+            )}
+            {msg.type === 'bot' && (
+              <div className="bot-message">
+                <div className="bot-icon"></div>
+                <div className="bot-content">{msg.content}</div>
+              </div>
+            )}
+          </div>
         </div>
       ))}
       {loading && (
