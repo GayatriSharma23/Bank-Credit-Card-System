@@ -17,7 +17,9 @@ function showVisual() {
         url: "/visual",
         data: { query: $("#text").val() }
     }).done(function(data) {
-        $("#visualOverlay .overlay-content").html(data.plot);
+        // Assuming the response contains a base64 encoded image string
+        var imageHtml = '<img src="data:image/png;base64,' + data.plot + '" alt="Generated Visual"/>';
+        $("#visualOverlay .overlay-content").html(imageHtml);
         $("#visualOverlay").show();
     });
 }
