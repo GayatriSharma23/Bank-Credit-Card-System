@@ -1,15 +1,31 @@
-// Functions to show and close overlays
+// Function to show SQL Query overlay
 function showSQL() {
-    document.getElementById("sqlOverlay").style.display = "block";
+    $.ajax({
+        type: "GET",
+        url: "/sql",
+        data: { query: $("#text").val() }
+    }).done(function(data) {
+        $("#sqlOverlay .overlay-content").html('<pre>' + JSON.stringify(data.sql_query, null, 2) + '</pre>');
+        $("#sqlOverlay").show();
+    });
 }
 
+// Function to show Visual overlay
 function showVisual() {
-    document.getElementById("visualOverlay").style.display = "block";
+    $.ajax({
+        type: "GET",
+        url: "/visual",
+        data: { query: $("#text").val() }
+    }).done(function(data) {
+        $("#visualOverlay .overlay-content").html(data.plot);
+        $("#visualOverlay").show();
+    });
 }
 
+// Function to close overlays
 function closeOverlay() {
-    document.getElementById('sqlOverlay').style.display = 'none';
-    document.getElementById('visualOverlay').style.display = 'none';
+    $("#sqlOverlay").hide();
+    $("#visualOverlay").hide();
 }
 
 $(document).ready(function() {
@@ -34,7 +50,7 @@ $(document).ready(function() {
         $.ajax({
             data: { msg: rawText },
             type: "POST",
-            url: "/get",
+            url: "/api/chat",
         }).done(function(data) {
             const date_done = new Date();
             const hour_done = date_done.getHours();
@@ -44,53 +60,27 @@ $(document).ready(function() {
             $("#typing").remove();
             var botHtml = '<div class="d-flex justify-content-start mb-4"><div class="msg_container"><p id="h7_send">' + data.response + '</p><span class="msg_time">' + str_time_done + '</span></div></div>';
             $("#messageFormeight").append(botHtml);
-
-            // Add buttons if SQL query or visual data exists
-            if (data.sql_query || data.plot) {
-                var buttonHtml = '<div class="button-container" style="margin-top: 10px;">';
-                if (data.sql_query) {
-                    buttonHtml += '<button class="sql-btn" id="showSQL" style="display: block;">Show SQL Query</button>';
-                }
-                if (data.plot) {
-                    buttonHtml += '<button class="visual-btn" id="showVisual" style="display: block;">Show Visual</button>';
-                }
-                buttonHtml += '</div>';
-
-                // Append the buttons to the same container as the bot's response
-                $("#messageFormeight").append(buttonHtml);
-            }
-
             $("#messageFormeight").animate({ scrollTop: $("#messageFormeight")[0].scrollHeight }, "slow");
 
-            // Add event listeners for buttons after they are appended to the DOM
-            $('#showSQL').on('click', function() {
-                $.ajax({
-                    type: "GET",
-                    url: "/sql",
-                }).done(function(data) {
-                    showOverlay(data);
-                });
-            });
-
-            $('#showVisual').on('click', function() {
-                $.ajax({
-                    type: "GET",
-                    url: "/visual",
-                }).done(function(data) {
-                    showOverlay(data);
-                });
-            });
+            // Show SQL Query and Visual buttons if applicable
+            if (data.sql_query || data.plot) {
+                $("#showSQL").show();
+                $("#showVisual").show();
+            } else {
+                $("#showSQL").hide();
+                $("#showVisual").hide();
+            }
         });
     });
 
-    // Function to show overlay with content
-    function showOverlay(content) {
-        $("#overlayContent").html(content);
-        $("#overlay").show();
-    }
+    // Initially hide SQL Query and Visual buttons
+    $("#showSQL").hide();
+    $('#showVisual').hide();
 
-    // Function to close overlay
-    function closeOverlay() {
-        $("#overlay").hide();
-    }
+    // Show SQL Query button event
+    $("#showSQL").on("click", showSQL);
+
+    // Show Visual button event
+    $("#showVisual").on("click", showVisual);
 });
+
