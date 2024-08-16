@@ -1,0 +1,44 @@
+def generate_response(query):
+    db = connection(connection_string)
+    llm = Ollama(model='PIA_2')
+    chain = SQLDatabaseChain.from_llm(llm, db, return_intermediate_steps=True, verbose=True, memory=memory)
+    try:
+        response = chain(query)
+        app.logger.debug(f"Chain response: {response}")
+        
+        intermediate_steps = response["intermediate_steps"]
+        app.logger.debug(f"Intermediate steps: {intermediate_steps}")
+
+        if len(intermediate_steps) > 3:
+            sql_result = intermediate_steps[3]
+        else:
+            sql_result = None
+        app.logger.debug(f"SQL result: {sql_result}")
+
+        if not sql_result:
+            return 'This information is not in my knowledge base.', None, None
+        else:
+            answer = response['result']
+            sql_query = extract_sql_query(response, index=2)
+            app.logger.debug(f"SQL Query: {sql_query}")
+
+            sql_result = extract_sql_result(response, index=3)
+            app.logger.debug(f"SQL Result: {sql_result}")
+
+            df = extract_column_names(sql_query['sql_cmd'], sql_result)
+            app.logger.debug(f"DataFrame: {df}")
+
+            chart_type = determine_chart_type(df)
+            app.logger.debug(f"Chart Type: {chart_type}")
+
+            plot = generate_chart(df, chart_type)
+            app.logger.debug(f"Plot: {plot}")
+
+            return answer, sql_query, plot
+    except SQLError:
+        return "There seems to be an issue with the database.", None, None
+    except LLMError:
+        return "Please try rephrasing or contact BI Team for further assistance.", None, None
+    except Exception as e:
+        app.logger.error(f"Unexpected error: {e}")
+        return "We are having trouble understanding your request. Please try rephrasing or contact BI Team for further assistance.", None, None
