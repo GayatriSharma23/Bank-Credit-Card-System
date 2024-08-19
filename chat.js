@@ -1,5 +1,5 @@
 import React from 'react';
-import SQLButton from './SQLButton';
+import SQLButton from './sqlbutton';
 import VisualButton from './VisualButton';
 
 const Chat = ({ messages, loading, sqlQuery, visualData }) => {
@@ -16,10 +16,12 @@ const Chat = ({ messages, loading, sqlQuery, visualData }) => {
             {msg.type === 'bot' && (
               <div className="bot-message">
                 <div className="bot-icon"></div>
-                <div className="bot-content">
-                  {msg.content}
+                <div className="bot-content">{msg.content}</div>
+
+                {/* Conditionally render SQLButton and VisualButton if bot responds */}
+                <div className="bot-response-buttons">
                   {sqlQuery && <SQLButton query={sqlQuery} />}
-                  {visualData && <VisualButton visualData={visualData} />}
+                  {visualData && <VisualButton plot={visualData} />}
                 </div>
               </div>
             )}
