@@ -1,6 +1,8 @@
 import React from 'react';
+import SQLButton from './SQLButton';
+import VisualButton from './VisualButton';
 
-const Chat = ({ messages, loading, sqlQuery, onViewSQL, visualData, onViewVisual }) => {
+const Chat = ({ messages, loading, sqlQuery, visualData }) => {
   return (
     <div className="chat">
       {messages.map((msg, index) => (
@@ -16,12 +18,8 @@ const Chat = ({ messages, loading, sqlQuery, onViewSQL, visualData, onViewVisual
                 <div className="bot-icon"></div>
                 <div className="bot-content">
                   {msg.content}
-                  {sqlQuery && (
-                    <button className="view-sql-button" onClick={onViewSQL}>View SQL Query</button>
-                  )}
-                  {visualData && (
-                    <button className="view-visual-button" onClick={onViewVisual}>View Visual</button>
-                  )}
+                  {sqlQuery && <SQLButton query={sqlQuery} />}
+                  {visualData && <VisualButton visualData={visualData} />}
                 </div>
               </div>
             )}
@@ -40,4 +38,3 @@ const Chat = ({ messages, loading, sqlQuery, onViewSQL, visualData, onViewVisual
 };
 
 export default Chat;
-
