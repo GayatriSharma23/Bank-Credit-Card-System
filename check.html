@@ -1,11 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pocket Insights Assistant</title>
-</head>
-<body>
-    <div id="root"></div>
-</body>
-</html>
+result_dict = {}
+
+for name, group in df.groupby('Name'):
+    # Convert group to a list of distances
+    distances = group['Distance'].tolist()
+    # Create a dictionary for the current name with keys as 'near 1', 'near 2', etc.
+    result_dict[name] = {f'near {i+1}': dist for i, dist in enumerate(distances)}
+
+# Convert the result dictionary to a DataFrame
+result_df = pd.DataFrame.from_dict(result_dict, orient='index').reset_index()
+result_df.rename(columns={'index': 'Name'}, inplace=True)
+
+# Print the result
+print(result_df)
