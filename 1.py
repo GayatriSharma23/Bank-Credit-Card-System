@@ -1,81 +1,76 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
+from pytorch_tabnet.tab_model import TabNetClassifier
+from tab_transformer_pytorch import TabTransformer
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Concatenate, Dense
+from tensorflow.keras.models import Model
 
-class TabTransformer(nn.Module):
-    def __init__(self, num_features, num_classes, dim_embedding=64, num_heads=4, num_layers=4):
-        super(TabTransformer, self).__init__()
-        self.embedding = nn.Linear(num_features, dim_embedding)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=dim_embedding, nhead=num_heads, batch_first=True)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.classifier = nn.Linear(dim_embedding, num_classes)
+# Define a PyTorch TabNet model
+class PyTorchTabNetModel(nn.Module):
+    def __init__(self):
+        super(PyTorchTabNetModel, self).__init__()
+        self.tabnet = TabNetClassifier()  # Initialize TabNet Classifier
 
     def forward(self, x):
-        # Check the input shape
-        print("Input shape to TabTransformer:", x.shape)
-        
-        x = self.embedding(x)
-        x = x.unsqueeze(1)  # Adding a sequence length dimension
-        x = self.transformer(x)
-        x = torch.mean(x, dim=1)  # Pooling
-        x = self.classifier(x)
-        return x
+        return self.tabnet(x)
 
-# Predict function
-def predict_in_batches(model, data_tensor, batch_size=1024):
-    model.eval()  # Set the model to evaluation mode
-    predictions = []
-    
-    # Create a DataLoader for the input tensor
-    data_loader = DataLoader(TensorDataset(data_tensor), batch_size=batch_size, shuffle=False)
+# Define a PyTorch TabTransformer model
+class PyTorchTabTransformerModel(nn.Module):
+    def __init__(self, input_dim):
+        super(PyTorchTabTransformerModel, self).__init__()
+        self.tab_transformer = TabTransformer(input_dim=input_dim, 
+                                              output_dim=128,  # Adjust output dimension as needed
+                                              num_classes=1)
 
-    with torch.no_grad():  # Disable gradient calculation for inference
-        for batch_X in data_loader:
-            batch_X = batch_X[0].to(device)  # Move to GPU if available
-            print("Batch input shape:", batch_X.shape)  # Print the shape of the batch input
-            outputs = model(batch_X)  # Get model predictions
-            predictions.append(outputs.cpu().numpy())  # Move to CPU and convert to numpy
+    def forward(self, x):
+        return self.tab_transformer(x)
 
-    return np.concatenate(predictions, axis=0)  # Combine all predictions
+# Create instances of the models
+tabnet_model = PyTorchTabNetModel()
+tabtransformer_model = PyTorchTabTransformerModel(input_dim=60)  # Adjust input_dim based on your features
 
-# Assume X_train_tensor is already created and has the correct number of features
-num_features = X_train_tensor.shape[1]  # Ensure this matches the embedding layer's input
+# Dummy input for demonstration purposes (replace with your actual data)
+# Assuming input shape is (batch_size, 60)
+dummy_data = torch.rand(300000, 60).float()  # Dummy data in PyTorch tensor format
 
-# Prepare the TabTransformer model
-tab_transformer_model = TabTransformer(num_features=num_features, num_classes=2).to(device)
+# Get predictions from TabNet
+with torch.no_grad():
+    tabnet_predictions = tabnet_model(dummy_data)
 
-# Get transformed features for training
-transformed_features_train = predict_in_batches(tab_transformer_model, X_train_tensor, batch_size=1024)
-print("Shape of transformed_features_train:", transformed_features_train.shape)  # Check shape
+# Get predictions from TabTransformer
+with torch.no_grad():
+    tabtransformer_predictions = tabtransformer_model(dummy_data)
 
-# Prepare the test tensor
-X_test_tensor = torch.FloatTensor(tabnet_features_test).to(device)
+# Convert both predictions to NumPy arrays for TensorFlow
+tabnet_predictions = tabnet_predictions.numpy()
+tabtransformer_predictions = tabtransformer_predictions.numpy()
 
-# Get transformed features for testing
-transformed_features_test = predict_in_batches(tab_transformer_model, X_test_tensor, batch_size=1024)
-print("Shape of transformed_features_test:", transformed_features_test.shape)  # Check shape
+# Define input shape for TensorFlow model
+input_shape = (300000, 128)  # Combined output shape from both models
 
-# Ensure that transformed features have the same shape
-if transformed_features_train.shape[1] != transformed_features_test.shape[1]:
-    raise ValueError("Transformed feature dimensions do not match: "
-                     f"Train shape: {transformed_features_train.shape}, "
-                     f"Test shape: {transformed_features_test.shape}")
+# Create a simple TensorFlow model to combine outputs
+tabnet_input = Input(shape=(60,))
+tabtransformer_input = Input(shape=(60,))
 
-# Convert transformed features to tensors for TabNet
-transformed_train_tensor = torch.FloatTensor(transformed_features_train).to(device)
-transformed_test_tensor = torch.FloatTensor(transformed_features_test).to(device)
+# Concatenate both outputs
+combined_output = Concatenate()([tf.convert_to_tensor(tabnet_predictions), 
+                                  tf.convert_to_tensor(tabtransformer_predictions)])
 
-# Print shapes to verify consistency
-print("Shape of transformed_train_tensor:", transformed_train_tensor.shape)
-print("Shape of transformed_test_tensor:", transformed_test_tensor.shape)
+# Final dense layer for binary classification
+predictions = Dense(1, activation='sigmoid')(combined_output)
 
-# Train TabNet using the latent features from TabTransformer
-clf = TabNetClassifier()
-clf.fit(transformed_features_train, smote_y_train.values, max_epochs=100, patience=10)
+# Create the combined model in TensorFlow
+combined_model = Model(inputs=[tabnet_input, tabtransformer_input], outputs=predictions)
 
-# Batch predictions with TabNet
-tabnet_test_preds = clf.predict(transformed_features_test)
-print(tabnet_test_preds)
+# Compile the model
+combined_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+# Train the TensorFlow model (assuming you have labels)
+# Replace train_data and train_labels with your actual training data
+# combined_model.fit(x=[train_data, train_data], y=train_labels, epochs=10, batch_size=32, validation_split=0.2)
+
+# Evaluate the model (assuming you have test_data and test_labels)
+# evaluation = combined_model.evaluate(x=[test_data, test_data], y=test_labels)
+# print(f'Test loss: {evaluation[0]}, Test accuracy: {evaluation[1]}')
 
