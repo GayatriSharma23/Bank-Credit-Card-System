@@ -1,40 +1,35 @@
-import torch
-import torch.nn as nn
-from pytorch_tabnet.tab_model import TabNetClassifier
-from tab_transformer_pytorch import TabTransformer
+import pandas as pd
 
-class CombinedModel(nn.Module):
-    def __init__(self, input_dim, output_dim, tabnet_params, tabtransformer_params, hidden_dim=64):
-        super(CombinedModel, self).__init__()
-        self.tabnet = TabNetClassifier(**tabnet_params)
-        self.tabtransformer = TabTransformer(**tabtransformer_params)
+# Sample DataFrame
+# df = pd.DataFrame(...) # Replace with your actual data if available
 
-        # Combine the output dimensions of both models
-        combined_dim = tabnet_params['n_d'] + tabtransformer_params['dim_out']
+# Convert column to numeric, if it’s not already numeric, setting non-convertible values to NaN
+df['Distance_btw_Branch_LAPCodes'] = pd.to_numeric(df['Distance_btw_Branch_LAPCodes'], errors='coerce')
 
-        # Shared layers for both models
-        self.shared_layers = nn.Sequential(
-            nn.Linear(combined_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.2)
-        )
+# Define a function to categorize each distance value
+def categorize_distance(distance):
+    if pd.isna(distance):
+        return None  # or any other placeholder for NaN values
+    elif distance < 2:
+        return '<2KM'
+    elif 2 <= distance <= 8:
+        return '2-8KM'
+    elif 8 < distance <= 18:
+        return '8-18KM'
+    elif 18 < distance <= 35:
+        return '18-35KM'
+    elif 35 < distance <= 82:
+        return '35-82KM'
+    elif 82 < distance <= 194:
+        return '82-194KM'
+    elif 194 < distance <= 610:
+        return '194-610KM'
+    else:
+        return '610+'
 
-        # Final layer
-        self.final_layer = nn.Sequential(
-            nn.Linear(hidden_dim, output_dim),
-            nn.Sigmoid()
-        )
+# Apply the function to each row in the 'Distance_btw_Branch_LAPCodes' column
+df['Distance_btw_Branch_LAPCodes_Bucket'] = df['Distance_btw_Branch_LAPCodes'].apply(categorize_distance)
 
-    def forward(self, x):
-        tabnet_output = self.tabnet(x)
-        tabtransformer_output = self.tabtransformer(x)
+# Display the result
+print(df[['Distance_btw_Branch_LAPCodes', 'Distance_btw_Branch_LAPCodes_Bucket']].head())
 
-        # Concatenate outputs at a higher layer
-        combined_output = torch.cat([tabnet_output, tabtransformer_output], dim=1)
-
-        # Pass combined output through shared layers
-        shared_output = self.shared_layers(combined_output)
-
-        # Final output
-        final_output = self.final_layer(shared_output)
-        return final_output
