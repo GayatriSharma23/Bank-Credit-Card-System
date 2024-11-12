@@ -3,37 +3,45 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 
-# Assuming df is your DataFrame with columns 'pincode', 'latitude', and 'longitude'
-# Set up `osmnx` for your area to get all amenities initially
+# Assuming `df` is your DataFrame with columns 'pincode', 'latitude', and 'longitude'
 session = requests.Session()
 session.verify = False
 ox.config(log_console=True, use_cache=True, requests_kwargs={'verify': False})
 
-# Retrieve amenities for a broader region
-gdf = ox.geometries_from_place("Jalandhar, Punjab, India", tags={'amenity': True})
-hospitals = gdf[gdf['amenity'] == 'hospital']
-police_stations = gdf[gdf['amenity'] == 'police']
+# Function to retrieve amenities around a pincode location
+def get_amenities_by_pincode(lat, lon, radius=1000):
+    # Define the point around which to search (1 km radius)
+    point = (lat, lon)
+    
+    try:
+        # Retrieve amenities around this point
+        gdf = ox.geometries_from_point(point, tags={'amenity': True}, dist=radius)
+        
+        # Filter for specific amenities
+        hospitals = gdf[gdf['amenity'] == 'hospital']
+        police_stations = gdf[gdf['amenity'] == 'police']
+        
+        # Return True if any hospitals or police stations are found
+        has_hospital = not hospitals.empty
+        has_police_station = not police_stations.empty
+    except Exception as e:
+        print(f"Error retrieving amenities for ({lat}, {lon}): {e}")
+        has_hospital = False
+        has_police_station = False
+    
+    return has_hospital, has_police_station
 
-# Convert amenities to GeoDataFrames with appropriate CRS
-hospitals = hospitals.set_geometry(hospitals.centroid).to_crs("EPSG:4326")
-police_stations = police_stations.set_geometry(police_stations.centroid).to_crs("EPSG:4326")
+# Apply function to each row in the DataFrame
+df['has_hospital'] = False
+df['has_police_station'] = False
 
-# Convert your DataFrame `df` to a GeoDataFrame
-df['geometry'] = df.apply(lambda x: Point(x['longitude'], x['latitude']), axis=1)
-gdf_locations = gpd.GeoDataFrame(df, geometry='geometry', crs="EPSG:4326")
+for index, row in df.iterrows():
+    lat, lon = row['latitude'], row['longitude']
+    has_hospital, has_police_station = get_amenities_by_pincode(lat, lon)
+    
+    # Update DataFrame
+    df.at[index, 'has_hospital'] = has_hospital
+    df.at[index, 'has_police_station'] = has_police_station
 
-# Define a proximity threshold in meters (e.g., 1000 meters)
-proximity_threshold = 1000
-
-# Function to check if amenities are within the threshold distance
-def check_proximity(location, amenities):
-    # Calculate distances and check if any amenities are within the threshold
-    return amenities.distance(location).min() <= (proximity_threshold / 1000 / 111)  # Approx conversion to degrees
-
-# Check proximity for each location
-df['near_hospital'] = gdf_locations['geometry'].apply(lambda loc: check_proximity(loc, hospitals))
-df['near_police_station'] = gdf_locations['geometry'].apply(lambda loc: check_proximity(loc, police_stations))
-
-# Display the DataFrame with proximity results
-print(df[['pincode', 'latitude', 'longitude', 'near_hospital', 'near_police_station']])
-
+# Display the updated DataFrame with proximity results
+print(df[['pincode', 'latitude', 'longitude', 'has_hospital', 'has_police_station']])
