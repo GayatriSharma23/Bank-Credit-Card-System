@@ -1,47 +1,54 @@
-import osmnx as ox
-import pandas as pd
-import geopandas as gpd
-from shapely.geometry import Point
+import requests
+from geopy.distance import geodesic
 
-# Assuming `df` is your DataFrame with columns 'pincode', 'latitude', and 'longitude'
-session = requests.Session()
-session.verify = False
-ox.config(log_console=True, use_cache=True, requests_kwargs={'verify': False})
-
-# Function to retrieve amenities around a pincode location
-def get_amenities_by_pincode(lat, lon, radius=1000):
-    # Define the point around which to search (1 km radius)
-    point = (lat, lon)
+# Function to query Overpass API for police stations around a given city (lat, lon)
+def get_police_stations_nearby(lat, lon, radius=10000):
+    overpass_url = "http://overpass-api.de/api/interpreter"
+    overpass_query = f"""
+    [out:json];
+    (
+      node["amenity"="police"](around:{radius},{lat},{lon});
+      way["amenity"="police"](around:{radius},{lat},{lon});
+      relation["amenity"="police"](around:{radius},{lat},{lon});
+    );
+    out body;
+    """
     
-    try:
-        # Retrieve amenities around this point
-        gdf = ox.geometries_from_point(point, tags={'amenity': True}, dist=radius)
-        
-        # Filter for specific amenities
-        hospitals = gdf[gdf['amenity'] == 'hospital']
-        police_stations = gdf[gdf['amenity'] == 'police']
-        
-        # Return True if any hospitals or police stations are found
-        has_hospital = not hospitals.empty
-        has_police_station = not police_stations.empty
-    except Exception as e:
-        print(f"Error retrieving amenities for ({lat}, {lon}): {e}")
-        has_hospital = False
-        has_police_station = False
+    response = requests.get(overpass_url, params={'data': overpass_query})
+    data = response.json()
     
-    return has_hospital, has_police_station
-
-# Apply function to each row in the DataFrame
-df['has_hospital'] = False
-df['has_police_station'] = False
-
-for index, row in df.iterrows():
-    lat, lon = row['latitude'], row['longitude']
-    has_hospital, has_police_station = get_amenities_by_pincode(lat, lon)
+    # Parse data to get lat/lon of each police station
+    police_stations = []
+    for element in data['elements']:
+        if 'lat' in element and 'lon' in element:
+            police_stations.append({
+                'name': element.get('tags', {}).get('name', 'Unnamed'),
+                'latitude': element['lat'],
+                'longitude': element['lon']
+            })
     
-    # Update DataFrame
-    df.at[index, 'has_hospital'] = has_hospital
-    df.at[index, 'has_police_station'] = has_police_station
+    return police_stations
 
-# Display the updated DataFrame with proximity results
-print(df[['pincode', 'latitude', 'longitude', 'has_hospital', 'has_police_station']])
+# Example of how to integrate with your city data
+def check_within_10km(city_lat, city_lon):
+    # Get police stations within 10 km of the city
+    police_stations = get_police_stations_nearby(city_lat, city_lon, radius=10000)
+    
+    # If there are police stations nearby, return True
+    if police_stations:
+        return True
+    return False
+
+# Sample cities DataFrame
+cities_df = pd.read_csv(r'/content/city_ps_check_4.csv')
+# Check proximity for each city
+cities_df['has_police_station_within_10km'] = cities_df.apply(
+    lambda row: check_within_10km(row['latitude'], row['longitude']), axis=1
+)
+
+# Save the updated DataFrame to CSV
+cities_df.to_csv('cities_with_police_station_proximity_part_3.csv', index=False)
+
+# Display the updated DataFrame
+print(cities_df)
+#6:10 pm
