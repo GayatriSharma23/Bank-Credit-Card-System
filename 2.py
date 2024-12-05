@@ -1,33 +1,48 @@
-fig.update_layout(
-    title_text="Parallel Categories Plot: Air Quality, Hospital Proximity, and Claims",
-    title_font_size=20,
-    showlegend=True,  # This will show the legend
-    updatemenus=[
-        {
-            'buttons': [
-                {
-                    'label': 'Show Claims = 1',
-                    'method': 'restyle',
-                    'args': [{'line.color': [claims == 1 for claims in df['claims']]}, [0]]  # Filter by claims = 1 (green)
-                },
-                {
-                    'label': 'Show Claims = 0',
-                    'method': 'restyle',
-                    'args': [{'line.color': [claims == 0 for claims in df['claims']]}, [0]]  # Filter by claims = 0 (red)
-                },
-                {
-                    'label': 'Show All',
-                    'method': 'restyle',
-                    'args': [{'line.color': claims.tolist()}, [0]]  # Show all data
-                }
-            ],
-            'direction': 'down',
-            'pad': {'r': 10, 't': 10},
-            'showactive': True,
-            'x': 0.17,
-            'xanchor': 'left',
-            'y': 1.15,
-            'yanchor': 'top'
-        }
-    ]
-)
+import plotly.express as px
+import pandas as pd
+
+def plot_dynamic_bar_chart(df):
+    # Identify numeric and categorical columns
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+
+    if len(numeric_cols) == 0 or len(categorical_cols) == 0:
+        raise ValueError("DataFrame must have at least one numeric and one categorical column.")
+
+    # Select the first numeric and categorical column
+    x_col = numeric_cols[0]
+    y_col = categorical_cols[0]
+
+    # Ensure categorical column is treated as category
+    df[y_col] = df[y_col].astype('category')
+
+    # Create the bar plot
+    fig = px.bar(
+        df,
+        x=x_col,
+        y=y_col,
+        orientation='h',  # Horizontal bar plot
+        text=x_col  # Display the count as text on the bar
+    )
+
+    # Update layout for better visualization
+    fig.update_layout(
+        title=f"Bar Plot of {x_col} by {y_col}",
+        xaxis_title=x_col,
+        yaxis_title=y_col,
+        xaxis=dict(type='linear'),  # Ensure x-axis is numeric
+        yaxis=dict(categoryorder='total ascending')  # Sort bars by count
+    )
+
+    return fig
+
+# Example DataFrame
+data = {
+    "itemscount": [343, 2345, 10, 1456],
+    "custstate": ["punjab", "up", "gujarat", "mp"]
+}
+df = pd.DataFrame(data)
+
+# Generate the bar plot
+fig = plot_dynamic_bar_chart(df)
+fig.show()
