@@ -1,48 +1,62 @@
-import plotly.express as px
 import pandas as pd
+from langchain_community.llms import Ollama
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 
-def plot_dynamic_bar_chart(df):
-    # Identify numeric and categorical columns
-    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+# Load CSV file
+try:
+    df = pd.read_csv(r'C:\Users\1137862\Desktop\Trnx_Analyser\AA_Data\IM_check_3_page_num_1.csv')
+    print(df.head())
+except Exception as e:
+    print(f"Error: {e}")
 
-    if len(numeric_cols) == 0 or len(categorical_cols) == 0:
-        raise ValueError("DataFrame must have at least one numeric and one categorical column.")
+TRANSACTION_COLUMN = 'Narration'
 
-    # Select the first numeric and categorical column
-    x_col = numeric_cols[0]
-    y_col = categorical_cols[0]
+# Initialize Ollama LLM
+llm = Ollama(model="trnx_analyzer_mixtral:latest")
 
-    # Ensure categorical column is treated as category
-    df[y_col] = df[y_col].astype('category')
+# Function to generate index list for batch processing
+def hop(start, stop, step):
+    for i in range(start, stop, step):
+        yield i
+    yield stop
 
-    # Create the bar plot
-    fig = px.bar(
-        df,
-        x=x_col,
-        y=y_col,
-        orientation='h',  # Horizontal bar plot
-        text=x_col  # Display the count as text on the bar
-    )
+# Get unique transactions & create batch indices
+unique_transactions = df[TRANSACTION_COLUMN].dropna().unique().tolist()
+index_list = list(hop(0, len(unique_transactions), 30))  # Adjust batch size as needed
 
-    # Update layout for better visualization
-    fig.update_layout(
-        title=f"Bar Plot of {x_col} by {y_col}",
-        xaxis_title=x_col,
-        yaxis_title=y_col,
-        xaxis=dict(type='linear'),  # Ensure x-axis is numeric
-        yaxis=dict(categoryorder='total ascending')  # Sort bars by count
-    )
+# Function to categorize transactions in batches
+def categorize_transactions(transaction_names, llm):
+    try:
+        # Prompt LLM with batched transactions
+        prompt = (
+            "Can you categorize the following transactions? Return output in 'Transaction - Category' format:\n\n" 
+            + "\n".join(transaction_names)
+        )
+        response = llm.invoke(prompt).strip()
+        response_lines = response.split("\n")
+        
+        # Convert response to DataFrame
+        categories_df = pd.DataFrame({'Transaction vs Category': response_lines})
+        categories_df[['Transaction', 'Category']] = categories_df['Transaction vs Category'].str.split(' - ', expand=True)
+        return categories_df[['Transaction', 'Category']]
+    except Exception as e:
+        print(f"Error processing batch: {e}")
+        return pd.DataFrame(columns=['Transaction', 'Category'])
 
-    return fig
+# DataFrame to store categorized transactions
+categories_df_all = pd.DataFrame(columns=['Transaction', 'Category'])
 
-# Example DataFrame
-data = {
-    "itemscount": [343, 2345, 10, 1456],
-    "custstate": ["punjab", "up", "gujarat", "mp"]
-}
-df = pd.DataFrame(data)
+# Loop through the index list and batch process transactions
+for i in range(len(index_list) - 1):
+    batch_transactions = unique_transactions[index_list[i]:index_list[i+1]]
+    categories_df = categorize_transactions(batch_transactions, llm)
+    categories_df_all = pd.concat([categories_df_all, categories_df], ignore_index=True)
 
-# Generate the bar plot
-fig = plot_dynamic_bar_chart(df)
-fig.show()
+# Merge categorized transactions back to original DataFrame
+df = df.merge(categories_df_all, left_on=TRANSACTION_COLUMN, right_on='Transaction', how='left').drop(columns=['Transaction'])
+
+# Save categorized transactions
+output_file = "categorized_transaction_mixtral.csv"
+df.to_csv(output_file, index=False)
+print("It's Done, check the file")
