@@ -1,15 +1,12 @@
 import time
 import difflib
 import pandas as pd
-import numpy as np
 from config import CONFIG
-from constants import CATEGORIES
 from categorizers import (
     normalize_transaction, get_category_from_keywords, 
     create_categorization_prompt, standardize_category
 )
 from data_handlers import load_cache, save_cache
-from feedback import load_feedback
 
 # Batch processing with better error handling
 def process_batch(transactions, llm, cache):
@@ -98,293 +95,170 @@ def process_batch(transactions, llm, cache):
     
     except Exception as e:
         print(f"Error processing batch: {e}")
-        # Fallback: assign Miscellaneous to all remaining transactions
+        # Fall back to Miscellaneous for all remaining transactions
         for tx in to_process:
             if tx not in results:
                 results[tx] = "Miscellaneous"
                 confidences[tx] = 0.0
-    
+                
     return results, confidences
 
-def apply_feedback_rules(df):
-    """
-    Apply user feedback to categorize transactions
+def process_transactions(df):
+    """Process all transactions in a DataFrame and return categorization results
     
     Args:
-        df (DataFrame): DataFrame containing transactions
+        df (pandas.DataFrame): DataFrame containing transactions
         
     Returns:
-        DataFrame: Updated DataFrame with feedback-based categories
+        tuple: (processed_df, category_dict, confidence_dict)
     """
-    # Load feedback data
-    feedback_data = load_feedback()
-    if not feedback_data:
-        print("No feedback data available to apply")
-        return df
+    # Initialize LLM
+    from langchain_community.llms import Ollama
+    llm = Ollama(model=CONFIG['model_name'])
     
-    # Create a copy to avoid modifying the original
-    result_df = df.copy()
-    
-    # Add columns for category and confidence if they don't exist
-    if 'Category' not in result_df.columns:
-        result_df['Category'] = None
-    if 'Confidence' not in result_df.columns:
-        result_df['Confidence'] = 0.0
-    if 'Rule' not in result_df.columns:
-        result_df['Rule'] = None
-    
-    # Track stats for reporting
-    feedback_count = 0
-    
-    # Apply exact matches first
-    for tx, category in feedback_data.items():
-        # Find exact matches
-        mask = result_df[CONFIG['transaction_column']] == tx
-        matches = mask.sum()
-        
-        if matches > 0:
-            # Update categories and set high confidence
-            result_df.loc[mask, 'Category'] = category
-            result_df.loc[mask, 'Confidence'] = 1.0
-            result_df.loc[mask, 'Rule'] = "Feedback: Exact match"
-            feedback_count += matches
-    
-    # Apply fuzzy matches for remaining uncategorized or low confidence transactions
-    if CONFIG.get('use_fuzzy_feedback', True):
-        uncategorized = result_df[(result_df['Category'].isna()) | 
-                                 (result_df['Confidence'] < CONFIG.get('confidence_threshold', 0.7))]
-        
-        for idx, row in uncategorized.iterrows():
-            tx = row[CONFIG['transaction_column']]
-            normalized_tx = normalize_transaction(tx)
-            
-            # Find best match in feedback
-            best_match = None
-            best_score = 0
-            
-            for feedback_tx in feedback_data.keys():
-                normalized_feedback = normalize_transaction(feedback_tx)
-                score = difflib.SequenceMatcher(None, normalized_tx, normalized_feedback).ratio()
-                if score > best_score and score > 0.8:  # Higher threshold for fuzzy feedback
-                    best_score = score
-                    best_match = feedback_tx
-            
-            if best_match:
-                result_df.loc[idx, 'Category'] = feedback_data[best_match]
-                result_df.loc[idx, 'Confidence'] = min(0.95, best_score)  # Cap at 0.95
-                result_df.loc[idx, 'Rule'] = f"Feedback: Fuzzy match ({best_score:.2f})"
-                feedback_count += 1
-    
-    print(f"Applied feedback to {feedback_count} transactions")
-    return result_df
-
-def process_transactions_batch(df, llm, batch_size=50, max_retries=3):
-    """
-    Process transactions in batches to avoid context limit issues
-    
-    Args:
-        df (DataFrame): DataFrame containing transactions
-        llm: Language model instance
-        batch_size (int): Number of transactions to process in each batch
-        max_retries (int): Maximum number of retries for failed batches
-        
-    Returns:
-        DataFrame: Processed DataFrame with categories and confidence scores
-    """
-    result_df = df.copy()
-    
-    # Add columns if they don't exist
-    if 'Category' not in result_df.columns:
-        result_df['Category'] = None
-    if 'Confidence' not in result_df.columns:
-        result_df['Confidence'] = 0.0
-    if 'Rule' not in result_df.columns:
-        result_df['Rule'] = None
-    
-    # Load the categorization cache
+    # Load cache
     cache = load_cache()
     
-    # Filter for uncategorized transactions
-    to_process = result_df[(result_df['Category'].isna()) | 
-                          (result_df['Confidence'] < CONFIG.get('confidence_threshold', 0.7))]
+    # Get unique transactions from the DataFrame
+    transactions = df[CONFIG['transaction_column']].dropna().unique().tolist()
+    print(f"Processing {len(transactions)} unique transactions...")
     
-    if len(to_process) == 0:
-        print("No transactions require processing")
-        return result_df
-    
-    print(f"Processing {len(to_process)} transactions in batches of {batch_size}...")
+    # Create dictionaries to store results
+    category_dict = {}
+    confidence_dict = {}
     
     # Process in batches
-    total_processed = 0
-    tx_column = CONFIG['transaction_column']
+    batch_size = CONFIG['batch_size']
+    num_batches = len(transactions) // batch_size + (1 if len(transactions) % batch_size > 0 else 0)
     
-    # Split into batches
-    for i in range(0, len(to_process), batch_size):
-        batch = to_process.iloc[i:i+batch_size]
-        transactions = batch[tx_column].tolist()
+    start_time = time.time()
+    for batch_num in range(num_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(transactions))
+        batch = transactions[start_idx:end_idx]
         
-        print(f"Processing batch {i//batch_size + 1}/{(len(to_process)-1)//batch_size + 1} ({len(transactions)} transactions)")
-        
-        # Process with retries
-        retries = 0
-        success = False
-        
-        while not success and retries < max_retries:
-            try:
-                results, confidences = process_batch(transactions, llm, cache)
-                success = True
-            except Exception as e:
-                retries += 1
-                print(f"Batch processing failed (attempt {retries}/{max_retries}): {e}")
-                time.sleep(2)  # Wait before retry
-                
-                if retries == max_retries:
-                    # Final fallback: assign Miscellaneous
-                    print("Max retries reached, using fallback categorization")
-                    results = {tx: "Miscellaneous" for tx in transactions}
-                    confidences = {tx: 0.0 for tx in transactions}
+        print(f"Processing batch {batch_num+1}/{num_batches} ({len(batch)} transactions)...")
+        batch_results, batch_confidences = process_batch(batch, llm, cache)
         
         # Update results
-        for tx in transactions:
-            if tx in results:
-                mask = result_df[tx_column] == tx
-                result_df.loc[mask, 'Category'] = results[tx]
-                result_df.loc[mask, 'Confidence'] = confidences[tx]
-                result_df.loc[mask, 'Rule'] = "LLM" if confidences[tx] > 0.0 else "Fallback"
-        
-        total_processed += len(transactions)
+        category_dict.update(batch_results)
+        confidence_dict.update(batch_confidences)
         
         # Save cache periodically
-        if i % (batch_size * 5) == 0 and i > 0:
+        if batch_num % 5 == 0:
             save_cache(cache)
-            print(f"Progress: {total_processed}/{len(to_process)} transactions processed")
     
-    # Final cache save
+    # Save final cache
     save_cache(cache)
     
-    print(f"Batch processing complete. Processed {total_processed} transactions.")
-    return result_df
+    # Create a copy of the input DataFrame with categories added
+    result_df = df.copy()
+    result_df['Category'] = result_df[CONFIG['transaction_column']].map(category_dict)
+    result_df['Confidence'] = result_df[CONFIG['transaction_column']].map(confidence_dict)
+    
+    # Handle missing categories (should be rare)
+    result_df['Category'] = result_df['Category'].fillna("Miscellaneous")
+    result_df['Confidence'] = result_df['Confidence'].fillna(0.0)
+    
+    # Calculate processing statistics
+    end_time = time.time()
+    processing_time = end_time - start_time
+    print(f"Processing completed in {processing_time:.2f} seconds")
+    
+    # Calculate completion rate
+    high_conf = (result_df['Confidence'] >= CONFIG['min_confidence']).mean() * 100
+    print(f"High confidence categorizations: {high_conf:.1f}%")
+    
+    return result_df, category_dict, confidence_dict
 
-def apply_consistency_rules(df):
-    """
-    Apply consistency rules to ensure similar transactions have consistent categories
+def apply_categories(df, category_dict, confidence_dict):
+    """Apply categorization results to the complete DataFrame
     
     Args:
-        df (DataFrame): DataFrame containing categorized transactions
+        df (pandas.DataFrame): Original DataFrame
+        category_dict (dict): Mapping from transaction to category
+        confidence_dict (dict): Mapping from transaction to confidence
         
     Returns:
-        DataFrame: DataFrame with consistent categories
+        pandas.DataFrame: DataFrame with categories added
     """
-    result_df = df.copy()
-    consistency_count = 0
+    # Create a copy to avoid modifying the original
+    categorized_df = df.copy()
     
-    # Group similar transactions
-    tx_column = CONFIG['transaction_column']
-    transactions = result_df[tx_column].tolist()
+    # Apply category and confidence to each row
+    categorized_df['Category'] = categorized_df[CONFIG['transaction_column']].map(category_dict)
+    categorized_df['Confidence'] = categorized_df[CONFIG['transaction_column']].map(confidence_dict)
     
-    # For each transaction
-    for i, tx1 in enumerate(transactions):
-        # Skip already high-confidence transactions
-        if result_df.iloc[i]['Confidence'] >= 0.9:
+    # Handle missing values
+    categorized_df['Category'] = categorized_df['Category'].fillna("Miscellaneous")
+    categorized_df['Confidence'] = categorized_df['Confidence'].fillna(0.0)
+    
+    # Apply consistency checks
+    categorized_df = ensure_consistency(categorized_df)
+    
+    return categorized_df
+
+def ensure_consistency(df):
+    """Ensure consistency in categorization across similar transactions
+    
+    Args:
+        df (pandas.DataFrame): DataFrame with initial categorizations
+        
+    Returns:
+        pandas.DataFrame: DataFrame with consistent categorizations
+    """
+    # Group by normalized transaction text
+    normalized_map = {}
+    for tx, category, confidence in zip(
+            df[CONFIG['transaction_column']], 
+            df['Category'], 
+            df['Confidence']):
+        
+        if pd.isna(tx) or not tx:
             continue
             
-        # Find similar transactions with higher confidence
-        similarities = []
-        for j, tx2 in enumerate(transactions):
-            if i == j or result_df.iloc[j]['Confidence'] < 0.9:
-                continue
+        normalized_tx = normalize_transaction(tx)
+        
+        if normalized_tx not in normalized_map:
+            normalized_map[normalized_tx] = []
+            
+        normalized_map[normalized_tx].append((category, confidence))
+    
+    # Find best category for each normalized transaction
+    best_categories = {}
+    for normalized_tx, categories in normalized_map.items():
+        if len(categories) == 1:
+            best_categories[normalized_tx] = categories[0][0]
+            continue
+            
+        # Count categories and weighted by confidence
+        category_scores = {}
+        for category, confidence in categories:
+            if category not in category_scores:
+                category_scores[category] = 0
+            category_scores[category] += confidence
+            
+        # Get category with highest score
+        best_category = max(category_scores.items(), key=lambda x: x[1])[0]
+        best_categories[normalized_tx] = best_category
+    
+    # Apply consistency
+    consistent_df = df.copy()
+    for i, tx in enumerate(consistent_df[CONFIG['transaction_column']]):
+        if pd.isna(tx) or not tx:
+            continue
+            
+        normalized_tx = normalize_transaction(tx)
+        if normalized_tx in best_categories:
+            consistent_category = best_categories[normalized_tx]
+            
+            # Only override if confidence is low
+            if consistent_df.loc[i, 'Confidence'] < CONFIG['min_confidence']:
+                consistent_df.loc[i, 'Category'] = consistent_category
+                # Increase confidence slightly but mark it as derived
+                consistent_df.loc[i, 'Confidence'] = min(
+                    CONFIG['min_confidence'], 
+                    consistent_df.loc[i, 'Confidence'] + 0.1
+                )
                 
-            # Calculate similarity
-            norm_tx1 = normalize_transaction(tx1)
-            norm_tx2 = normalize_transaction(tx2)
-            similarity = difflib.SequenceMatcher(None, norm_tx1, norm_tx2).ratio()
-            
-            if similarity >= 0.85:
-                similarities.append((similarity, j))
-        
-        # Sort by similarity (highest first)
-        similarities.sort(reverse=True)
-        
-        # Apply most similar high-confidence category if available
-        if similarities:
-            best_idx = similarities[0][1]
-            best_similarity = similarities[0][0]
-            best_category = result_df.iloc[best_idx]['Category']
-            
-            result_df.iloc[i, result_df.columns.get_loc('Category')] = best_category
-            result_df.iloc[i, result_df.columns.get_loc('Confidence')] = min(0.85, best_similarity)
-            result_df.iloc[i, result_df.columns.get_loc('Rule')] = f"Consistency ({best_similarity:.2f})"
-            consistency_count += 1
-    
-    print(f"Applied consistency rules to {consistency_count} transactions")
-    return result_df
-
-def identify_low_confidence(df):
-    """
-    Identify transactions with low confidence for review
-    
-    Args:
-        df (DataFrame): DataFrame containing categorized transactions
-        
-    Returns:
-        DataFrame: DataFrame containing low confidence transactions
-    """
-    # Define threshold from config
-    threshold = CONFIG.get('confidence_threshold', 0.7)
-    
-    # Filter low confidence transactions
-    low_conf_df = df[df['Confidence'] < threshold].copy()
-    
-    # Sort by confidence (ascending)
-    if len(low_conf_df) > 0:
-        low_conf_df = low_conf_df.sort_values('Confidence')
-    
-    print(f"Identified {len(low_conf_df)} low confidence transactions")
-    return low_conf_df
-
-def process_transactions(df, llm):
-    """
-    Main processing function to categorize transactions
-    
-    Args:
-        df (DataFrame): DataFrame containing transactions
-        llm: Language model instance
-        
-    Returns:
-        DataFrame: Processed DataFrame with categories
-        DataFrame: Low confidence transactions for review
-    """
-    print(f"Processing {len(df)} transactions...")
-    
-    # Apply feedback first
-    df = apply_feedback_rules(df)
-    
-    # Process remaining transactions in batches
-    df = process_transactions_batch(df, llm)
-    
-    # Apply consistency rules
-    df = apply_consistency_rules(df)
-    
-    # Identify low confidence transactions
-    low_conf_df = identify_low_confidence(df)
-    
-    # Ensure all categories are valid
-    df['Category'] = df['Category'].apply(
-        lambda x: x if x in CATEGORIES else "Miscellaneous"
-    )
-    
-    # Fill any remaining NaNs
-    df['Category'] = df['Category'].fillna("Miscellaneous")
-    df['Confidence'] = df['Confidence'].fillna(0.0)
-    
-    # Generate summary statistics
-    category_counts = df['Category'].value_counts()
-    print("\nCategory Distribution:")
-    for category, count in category_counts.items():
-        print(f"  {category}: {count} ({count/len(df)*100:.1f}%)")
-    
-    print(f"\nAverage confidence: {df['Confidence'].mean():.2f}")
-    print(f"Transactions requiring review: {len(low_conf_df)} ({len(low_conf_df)/len(df)*100:.1f}%)")
-    
-    return df, low_conf_df
-  
+    return consistent_df
