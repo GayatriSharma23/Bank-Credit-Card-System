@@ -171,10 +171,14 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
             label_opts=opts.LabelOpts(is_show=labelShow),
             # Add focus node adjacency to highlight connections
             focus_node_adjacency=True,
-            # Add node emphasis settings
-            emphasis_opts=opts.EmphasisOpts(
-                label_opts=opts.LabelOpts(is_show=True, font_size=16, font_weight="bold"),
-                edge_label_opts=opts.LabelOpts(is_show=True, font_size=14)
+            # Add emphasis settings using the correct pyecharts syntax
+            itemstyle_opts=opts.ItemStyleOpts(
+                border_color="#000",
+                border_width=2
+            ),
+            linestyle_opts=opts.LineStyleOpts(
+                width=2,
+                curve=0.3
             )
         )
         .set_global_opts(
