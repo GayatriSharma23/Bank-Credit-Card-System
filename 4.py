@@ -152,7 +152,7 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
             family_mapping[family] = []
         family_mapping[family].append(code)
     
-    # Create graph with enhanced interactivity
+    # Create graph with enhanced interactivity - using compatible options
     g = (
         Graph(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="1000px", height="800px"))
         .add(
@@ -169,13 +169,7 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
             layout="force",
             is_roam=True,
             label_opts=opts.LabelOpts(is_show=labelShow),
-            # Add focus node adjacency to highlight connections
-            focus_node_adjacency=True,
-            # Add emphasis settings using the correct pyecharts syntax
-            itemstyle_opts=opts.ItemStyleOpts(
-                border_color="#000",
-                border_width=2
-            ),
+            # Use the proper format for line styling
             linestyle_opts=opts.LineStyleOpts(
                 width=2,
                 curve=0.3
@@ -196,31 +190,64 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
         )
     )
     
-    # Add JavaScript to enhance interactivity
+    # Add custom JavaScript to implement the focus_node_adjacency functionality
     js_functions = """
     chart_CHART_ID.on('click', function(params) {
         if (params.dataType === 'node') {
+            // Get all series data
+            var seriesData = chart_CHART_ID.getOption().series[0];
+            var nodes = seriesData.data;
+            var links = seriesData.links;
+            
             // Get the clicked node's name
             var nodeName = params.name;
             
-            // Clear any previous highlights
-            chart_CHART_ID.dispatchAction({
-                type: 'downplay'
-            });
+            // Reset all nodes and links to default opacity
+            for (var i = 0; i < nodes.length; i++) {
+                nodes[i].itemStyle = {opacity: 0.3};
+                nodes[i].label = {opacity: 0.3};
+            }
+            
+            for (var i = 0; i < links.length; i++) {
+                links[i].lineStyle = {opacity: 0.1, width: 1};
+                links[i].label = {opacity: 0.1};
+            }
             
             // If it's a family node, highlight this node and its connections
             if (nodeName.startsWith('Family_')) {
-                chart_CHART_ID.dispatchAction({
-                    type: 'highlight',
-                    name: nodeName
-                });
+                // Highlight the clicked node
+                for (var i = 0; i < nodes.length; i++) {
+                    if (nodes[i].name === nodeName) {
+                        nodes[i].itemStyle = {opacity: 1, borderWidth: 3, borderColor: '#000'};
+                        nodes[i].label = {opacity: 1, fontWeight: 'bold'};
+                        break;
+                    }
+                }
                 
-                // Find all related nodes for this family and highlight them
-                chart_CHART_ID.dispatchAction({
-                    type: 'focusNodeAdjacency',
-                    seriesIndex: 0,
-                    name: nodeName
-                });
+                // Find all connected nodes and highlight them
+                var connectedNodes = [];
+                for (var i = 0; i < links.length; i++) {
+                    if (links[i].source === nodeName) {
+                        connectedNodes.push(links[i].target);
+                        links[i].lineStyle = {opacity: 1, width: 3};
+                        links[i].label = {opacity: 1, fontWeight: 'bold'};
+                    } else if (links[i].target === nodeName) {
+                        connectedNodes.push(links[i].source);
+                        links[i].lineStyle = {opacity: 1, width: 3};
+                        links[i].label = {opacity: 1, fontWeight: 'bold'};
+                    }
+                }
+                
+                // Highlight the connected nodes
+                for (var i = 0; i < nodes.length; i++) {
+                    if (connectedNodes.includes(nodes[i].name)) {
+                        nodes[i].itemStyle = {opacity: 1};
+                        nodes[i].label = {opacity: 1, fontWeight: 'bold'};
+                    }
+                }
+                
+                // Update the chart
+                chart_CHART_ID.setOption({series: [seriesData]});
             }
         }
     });
@@ -271,3 +298,4 @@ if __name__ == "__main__":
     graph = build_family_relationship_graph(df, title="Interactive Family Relationships")
     graph.render("interactive_family_graph.html")
     print("Graph has been saved as 'interactive_family_graph.html'")
+
