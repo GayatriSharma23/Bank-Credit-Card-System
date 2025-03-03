@@ -6,7 +6,7 @@ from pyecharts.globals import ThemeType
 
 def build_family_relationship_graph(df, title='Family Relationship Knowledge Graph', repulsion=400, labelShow=True):
     """
-    Build a knowledge graph showing relationships between family_id and associated codes
+    Build an interactive knowledge graph showing relationships between family_id and associated codes
     
     Parameters:
     -----------
@@ -22,7 +22,7 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
     Returns:
     --------
     pyecharts.charts.Graph
-        The rendered graph object
+        The rendered graph object with enhanced interactivity
     """
     # Create a new dataframe for graph structure
     graph_data = []
@@ -129,7 +129,9 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
         nodes.append({
             'name': entity,
             'symbolSize': symbol_size,
-            'category': category
+            'category': category,
+            # Add ID for referencing in JavaScript interactivity
+            'id': entity
         })
     
     # Define links
@@ -141,9 +143,18 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
             'value': graph_df.loc[i, 'Relation']
         })
     
-    # Create and configure the graph
+    # Create a family to codes mapping for interactivity
+    family_mapping = {}
+    for idx, row in graph_df.iterrows():
+        family = row['Node']
+        code = row['Edge']
+        if family not in family_mapping:
+            family_mapping[family] = []
+        family_mapping[family].append(code)
+    
+    # Create graph with enhanced interactivity
     g = (
-        Graph(init_opts=opts.InitOpts(theme=ThemeType.LIGHT))
+        Graph(init_opts=opts.InitOpts(theme=ThemeType.LIGHT, width="1000px", height="800px"))
         .add(
             series_name="",
             nodes=nodes,
@@ -157,7 +168,14 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
             ),
             layout="force",
             is_roam=True,
-            label_opts=opts.LabelOpts(is_show=labelShow)
+            label_opts=opts.LabelOpts(is_show=labelShow),
+            # Add focus node adjacency to highlight connections
+            focus_node_adjacency=True,
+            # Add node emphasis settings
+            emphasis_opts=opts.EmphasisOpts(
+                label_opts=opts.LabelOpts(is_show=True, font_size=16, font_weight="bold"),
+                edge_label_opts=opts.LabelOpts(is_show=True, font_size=14)
+            )
         )
         .set_global_opts(
             title_opts=opts.TitleOpts(title=title),
@@ -165,9 +183,46 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
                 orient='vertical',
                 pos_left='2%',
                 pos_top='20%'
+            ),
+            # Add tooltip to show node details
+            tooltip_opts=opts.TooltipOpts(
+                trigger="item",
+                formatter="{b}: {c}"
             )
         )
     )
+    
+    # Add JavaScript to enhance interactivity
+    js_functions = """
+    chart_CHART_ID.on('click', function(params) {
+        if (params.dataType === 'node') {
+            // Get the clicked node's name
+            var nodeName = params.name;
+            
+            // Clear any previous highlights
+            chart_CHART_ID.dispatchAction({
+                type: 'downplay'
+            });
+            
+            // If it's a family node, highlight this node and its connections
+            if (nodeName.startsWith('Family_')) {
+                chart_CHART_ID.dispatchAction({
+                    type: 'highlight',
+                    name: nodeName
+                });
+                
+                // Find all related nodes for this family and highlight them
+                chart_CHART_ID.dispatchAction({
+                    type: 'focusNodeAdjacency',
+                    seriesIndex: 0,
+                    name: nodeName
+                });
+            }
+        }
+    });
+    """
+    
+    g.add_js_funcs(js_functions)
     
     return g
 
@@ -179,3 +234,36 @@ def build_family_relationship_graph(df, title='Family Relationship Knowledge Gra
 # graph = build_family_relationship_graph(df)
 # graph.render_notebook()  # For Jupyter notebook
 # graph.render("family_graph.html")  # To save as HTML file
+
+# Example sample data creation (for testing)
+def create_sample_data():
+    # Create sample data
+    data = []
+    for i in range(1, 6):  # 5 families
+        owner = f"O_{i}"
+        la = f"LA_{i}"
+        payer = f"P_{i}" if i % 3 != 0 else None  # Some families don't have payers
+        nominee1 = f"N1_{i}" if i % 2 == 0 else None  # Some families don't have nominees
+        nominee2 = f"N2_{i}" if i % 4 == 0 else None
+        
+        data.append({
+            'family_id': f"FAM{i}",
+            'owner_code': owner,
+            'la_code': la,
+            'payer_code': payer,
+            'nominee_1': nominee1,
+            'nominee_2': nominee2
+        })
+    
+    # Add some overlaps (same person has different roles in different families)
+    data[3]['owner_code'] = data[0]['la_code']  # LA of family 1 is owner of family 4
+    data[2]['nominee_1'] = data[1]['owner_code']  # Owner of family 2 is nominee of family 3
+    
+    return pd.DataFrame(data)
+
+# Create sample data and generate graph
+if __name__ == "__main__":
+    df = create_sample_data()
+    graph = build_family_relationship_graph(df, title="Interactive Family Relationships")
+    graph.render("interactive_family_graph.html")
+    print("Graph has been saved as 'interactive_family_graph.html'")
