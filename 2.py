@@ -2,14 +2,12 @@ import numpy as np
 import pandas as pd
 from pyecharts import options as opts
 from pyecharts.charts import Graph
-from pyecharts.render import make_snapshot
 from IPython.display import display, HTML
 
-# Function to build the knowledge graph
 def Build_graph(df, relation=False, repulsion=80, title='Knowledge Graph', labelShow=True, output_file='knowledge_graph.html'):
     """
     Build and render a knowledge graph from a dataframe of relationships.
-
+    
     Parameters:
     -----------
     df : pandas.DataFrame
@@ -37,12 +35,6 @@ def Build_graph(df, relation=False, repulsion=80, title='Knowledge Graph', label
         'PRODUCT NAME': '#25162b', 'STAT_CLAIM': '#ab945a', 'AGE': '#77DD77'
     }
 
-    # Category mapping
-    cate = {key: i for i, key in enumerate(color_map.keys())}
-
-    # Define categories for graph styling
-    categories = [{"name": key, "itemStyle": {"color": color_map[key]}} for key in color_map.keys()]
-
     # Map entity types
     entity_type_dic = df.drop_duplicates(['Node']).set_index(['Node'])['Start_Entity'].to_dict()
     entity_type_dic.update(df.drop_duplicates(['Edge']).set_index(['Edge'])['End_entity'].to_dict())
@@ -50,14 +42,14 @@ def Build_graph(df, relation=False, repulsion=80, title='Knowledge Graph', label
     # Create nodes with calculated sizes
     nodes = []
     for entity in set(df['Node']).union(set(df['Edge'])):
-        if entity in entity_type_dic and entity_type_dic[entity] in cate:
-            size = max(10, np.log1p(df[(df['Node'] == entity) | (df['Edge'] == entity)].shape[0]) * 10 // 1)
-            nodes.append({
-                "name": entity,
-                "symbolSize": size,
-                "category": cate[entity_type_dic[entity]],
-                "itemStyle": {"color": color_map.get(entity_type_dic[entity], "#cccccc")}
-            })
+        node_color = color_map.get(entity_type_dic.get(entity, ""), "#cccccc")  # Default gray if type is missing
+        size = max(10, np.log1p(df[(df['Node'] == entity) | (df['Edge'] == entity)].shape[0]) * 10 // 1)
+        
+        nodes.append({
+            "name": entity,
+            "symbolSize": size,
+            "itemStyle": {"color": node_color}
+        })
 
     # Create links (edges) with optional relation labels
     links = []
@@ -74,7 +66,6 @@ def Build_graph(df, relation=False, repulsion=80, title='Knowledge Graph', label
             "",
             nodes,
             links,
-            categories=categories,
             repulsion=repulsion,
             is_roam=True,
             is_focusnode=True,
@@ -87,7 +78,7 @@ def Build_graph(df, relation=False, repulsion=80, title='Knowledge Graph', label
         .set_global_opts(
             title_opts=opts.TitleOpts(title=title, title_textstyle_opts=opts.TextStyleOpts(font_size=20)),
             tooltip_opts=opts.TooltipOpts(trigger="item", formatter="{b}"),
-            legend_opts=opts.LegendOpts(pos_left="5%", pos_top="15%", item_gap=20, item_width=30, item_height=16),
+            legend_opts=opts.LegendOpts(is_show=False),  # Hides legends
         )
     )
 
@@ -96,7 +87,15 @@ def Build_graph(df, relation=False, repulsion=80, title='Knowledge Graph', label
     print(f"Graph saved to: {output_path}")
 
     # Render graph in Jupyter Notebook
-    display(HTML(output_file))  # This will display the saved HTML in Jupyter Notebook
+    display(HTML(output_file))  # Display the saved HTML in Jupyter Notebook
 
+# Example usage
+df = pd.DataFrame({
+    "Node": ["Alice", "Bob", "Alice", "Charlie"],
+    "Edge": ["Bob", "Charlie", "Charlie", "David"],
+    "Start_Entity": ["PERSON", "PERSON", "PERSON", "PERSON"],
+    "End_entity": ["PERSON", "PERSON", "PERSON", "PERSON"],
+    "pred": ["friend", "colleague", "knows", "neighbor"]
+})
 
 Build_graph(df, relation=True, output_file="knowledge_graph.html")
