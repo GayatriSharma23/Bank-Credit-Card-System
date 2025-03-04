@@ -1,4 +1,4 @@
-def Build_graph(df, relation=False, repulsion=40, title='Knowledge Graph', labelShow=False):
+def Build_graph(df, relation=False, repulsion=40, title='Knowledge Graph', labelShow=False, output_file='knowledge_graph.html'):
     # Create dictionary mapping entities to their types
     entity_type_dic = dict(df.drop_duplicates(['Node']).set_index(['Node'])['Start_Entity'])
     entity_type_dic.update(df.drop_duplicates(['Edge']).set_index(['Edge'])['End_entity'])
@@ -86,7 +86,7 @@ def Build_graph(df, relation=False, repulsion=40, title='Knowledge Graph', label
                 legend_icon='circle'
             )
         )
-        .render_notebook()
+        .render(output_file)  # Changed from render_notebook() to render() with a file path
     )
     
-    return g
+    return output_file
