@@ -1,347 +1,215 @@
-import time
-import difflib
+import numpy as np
+import cv2
 import pandas as pd
-from config import CONFIG
-from categorizers import (
-    normalize_transaction, get_category_from_keywords,
-    create_categorization_prompt, standardize_category
-)
-from data_handlers import load_cache, save_cache
+import os
+from PIL import Image
+try:
+    import easyocr
+except ImportError:
+    print("EasyOCR not installed. Installing now...")
+    import subprocess
+    subprocess.check_call(["pip", "install", "easyocr"])
+    import easyocr
 
-def normalize_transaction_type(type_value):
-    """Normalize transaction type to CREDIT or DEBIT"""
-    if pd.isna(type_value) or not type_value:
-        return "DEBIT"  # Default to DEBIT
-        
-    type_value = str(type_value).strip().upper()
+def preprocess_image(image_path):
+    """
+    Preprocess image to enhance text visibility for OCR
+    """
+    # Read image
+    img = cv2.imread(image_path)
     
-    if type_value in ['CREDIT', 'CR', 'C', 'DEPOSIT', 'RECEIVED']:
-        return "CREDIT"
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # Apply adaptive thresholding to handle different lighting conditions
+    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                  cv2.THRESH_BINARY, 11, 2)
+    
+    # Denoise
+    denoised = cv2.fastNlMeansDenoising(thresh, None, 10, 7, 21)
+    
+    return img, denoised
+
+def detect_table_structure(img):
+    """
+    Detect lines to identify table structure
+    """
+    # Convert to grayscale if not already
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     else:
-        return "DEBIT"  # Default everything else to DEBIT
+        gray = img
+        
+    # Apply threshold
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+    
+    # Detect horizontal lines
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
+    horizontal_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel)
+    
+    # Detect vertical lines
+    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
+    vertical_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, vertical_kernel)
+    
+    # Combine horizontal and vertical lines
+    table_structure = cv2.add(horizontal_lines, vertical_lines)
+    
+    # Find contours
+    contours, _ = cv2.findContours(table_structure, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # Get the largest contour (likely the table)
+    if contours:
+        largest_contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(largest_contour)
+        return x, y, w, h
+    
+    return 0, 0, img.shape[1], img.shape[0]
 
-# Batch processing with better error handling and type consideration
-def process_batch(transactions, llm, cache):
-    """Process a batch of transactions with improved handling including transaction type"""
-    results = {}
-    confidences = {}
-   
-    # First check cache and keywords for all transactions
-    to_process = []
-    for tx_data in transactions:
-        tx = tx_data["narration"]
-        tx_type = tx_data["type"]
-        tx_id = tx_data["id"]
-        
-        # Skip empty transactions
-        if pd.isna(tx) or not tx:
-            results[tx_id] = "Miscellaneous"
-            confidences[tx_id] = 0.0
-            continue
-           
-        # Try keywords first (now with type consideration)
-        keyword_category = get_category_from_keywords(tx, tx_type)
-        if keyword_category:
-            results[tx_id] = keyword_category
-            confidences[tx_id] = 1.0
-            continue
-           
-        # Check cache with composite key
-        normalized_tx = normalize_transaction(tx)
-        composite_key = f"{normalized_tx}|{tx_type}"
-        if composite_key in cache:
-            results[tx_id] = cache[composite_key]
-            confidences[tx_id] = 1.0
-            continue
-           
-        # Need to process with LLM
-        to_process.append(tx_data)
-   
-    # Skip LLM call if all transactions are handled
-    if not to_process:
-        return results, confidences
-   
-    # Process with LLM
-    try:
-        prompt = create_categorization_prompt(to_process)
-        response = llm.invoke(prompt).strip()
-       
-        # Parse response
-        parsed_results = {}
-        for line in response.split('\n'):
-            line = line.strip()
-            if '→' in line or '->' in line:
-                # Standardize arrows
-                line = line.replace('->', '→')
-                parts = line.split('→', 1)
-                if len(parts) == 2:
-                    tx, category = parts[0].strip(' "\''), parts[1].strip()
-                    std_category = standardize_category(category)
-                    parsed_results[tx] = std_category
-       
-        # Match results back to original transactions
-        for i, tx_data in enumerate(to_process):
-            tx = tx_data["narration"]
-            tx_type = tx_data["type"]
-            tx_id = tx_data["id"]
-            
-            # Try direct match first
-            if tx in parsed_results:
-                results[tx_id] = parsed_results[tx]
-                confidences[tx_id] = 0.95
-                normalized_tx = normalize_transaction(tx)
-                composite_key = f"{normalized_tx}|{tx_type}"
-                cache[composite_key] = parsed_results[tx]
-                continue
-               
-            # Try matching with normalized versions
-            normalized_tx = normalize_transaction(tx)
-            best_match = None
-            best_score = 0
-           
-            for parsed_tx in parsed_results:
-                normalized_parsed = normalize_transaction(parsed_tx)
-                score = difflib.SequenceMatcher(None, normalized_tx, normalized_parsed).ratio()
-                if score > best_score and score > 0.7:
-                    best_score = score
-                    best_match = parsed_tx
-           
-            if best_match:
-                # Apply type-based validation/correction
-                category = parsed_results[best_match]
-                
-                # Adjust category based on transaction type if needed
-                if tx_type == "CREDIT" and not any(income_term in category.lower() for income_term in ["income", "refund", "reimbursement", "gift"]):
-                    # If it's a credit but not categorized as income-related, consider adjusting
-                    if hasattr(CONFIG, 'TRANSACTION_PATTERNS'):
-                        for keyword, pattern_category in CONFIG.TRANSACTION_PATTERNS.items():
-                            if keyword in tx.upper() and "Income" in pattern_category:
-                                category = pattern_category
-                                break
-                
-                results[tx_id] = category
-                confidences[tx_id] = best_score
-                composite_key = f"{normalized_tx}|{tx_type}"
-                cache[composite_key] = category
-            else:
-                # No good match found - use default type-based fallback
-                if tx_type == "CREDIT":
-                    results[tx_id] = "Other Income"
-                else:
-                    results[tx_id] = "Miscellaneous"
-                confidences[tx_id] = 0.0
-   
-    except Exception as e:
-        print(f"Error processing batch: {e}")
-        # Fall back to type-based defaults for all remaining transactions
-        for tx_data in to_process:
-            tx_id = tx_data["id"]
-            tx_type = tx_data["type"]
-            if tx_id not in results:
-                if tx_type == "CREDIT":
-                    results[tx_id] = "Other Income"
-                else:
-                    results[tx_id] = "Miscellaneous"
-                confidences[tx_id] = 0.0
-               
-    return results, confidences
- 
-def process_transactions(df):
-    """Process transactions with type column for categorization"""
-    # Initialize LLM
-    from langchain_community.llms import Ollama
-    llm = Ollama(model=CONFIG['model_name'])
-   
-    # Load cache
-    cache = load_cache()
-   
-    # Check if required columns exist
-    if CONFIG['transaction_column'] not in df.columns:
-        print(f"Error: Transaction column '{CONFIG['transaction_column']}' not found in data")
-        return df, {}, {}
-        
-    if CONFIG['type_column'] not in df.columns:
-        print(f"Warning: Type column '{CONFIG['type_column']}' not found, using DEBIT as default")
-        df[CONFIG['type_column']] = "DEBIT"  # Default to DEBIT if type column missing
+def find_cells(processed_img):
+    """
+    Find individual cells in the table
+    """
+    # Find contours
+    contours, _ = cv2.findContours(~processed_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
-    # Normalize column values to CREDIT/DEBIT
-    df[CONFIG['type_column']] = df[CONFIG['type_column']].apply(normalize_transaction_type)
-    
-    # Create dictionaries to store results
-    category_dict = {}
-    confidence_dict = {}
-    
-    # Get transactions that need categorization
-    transactions_to_process = []
-    
-    for idx, row in df.iterrows():
-        tx = row[CONFIG['transaction_column']]
-        tx_type = row[CONFIG['type_column']]
+    # Filter contours based on area to find table cells
+    cells = []
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        area = w * h
         
-        if pd.isna(tx) or not tx:
-            category_dict[idx] = "Miscellaneous"
-            confidence_dict[idx] = 0.0
-            continue
-            
-        normalized_tx = normalize_transaction(tx)
-        composite_key = f"{normalized_tx}|{tx_type}"
-        
-        # Check if in cache already
-        if composite_key in cache:
-            category_dict[idx] = cache[composite_key]
-            confidence_dict[idx] = 1.0  # Full confidence for cache hits
+        # Filter by size to exclude very small or large contours
+        if 100 < area < processed_img.shape[0] * processed_img.shape[1] / 4:
+            cells.append((x, y, w, h))
+    
+    # Sort cells by row and column
+    cells.sort(key=lambda cell: (cell[1], cell[0]))
+    
+    return cells
+
+def extract_text_with_easyocr(img, x, y, w, h):
+    """
+    Extract text from a cell using EasyOCR
+    """
+    reader = easyocr.Reader(['en'])
+    
+    # Crop the cell
+    cell_img = img[y:y+h, x:x+w]
+    
+    # Extract text
+    results = reader.readtext(cell_img)
+    
+    # Combine all text found
+    text = ' '.join([result[1] for result in results])
+    
+    return text
+
+def extract_table_from_image(image_path, output_csv=None):
+    """
+    Main function to extract tabular data from an image
+    """
+    print(f"Processing image: {image_path}")
+    
+    # Preprocess image
+    original_img, processed_img = preprocess_image(image_path)
+    
+    # Detect table area
+    x, y, w, h = detect_table_structure(processed_img)
+    table_img = processed_img[y:y+h, x:x+w]
+    original_table_img = original_img[y:y+h, x:x+w]
+    
+    # Find cells
+    cells = find_cells(table_img)
+    
+    # Initialize EasyOCR
+    reader = easyocr.Reader(['en'])
+    print("EasyOCR initialized")
+    
+    # Group cells into rows based on y-coordinate
+    rows = []
+    current_row = []
+    current_y = None
+    
+    # Sort cells by y-coordinate
+    cells.sort(key=lambda cell: cell[1])
+    
+    # Group cells into rows
+    for cell in cells:
+        x, y, w, h = cell
+        if current_y is None:
+            current_y = y
+            current_row.append(cell)
+        elif abs(y - current_y) < 20:  # Cells in same row if y difference is small
+            current_row.append(cell)
         else:
-            # Add to processing batch with ID for tracking
-            transactions_to_process.append({
-                "id": idx,
-                "narration": tx,
-                "type": tx_type
-            })
+            # Sort cells in row by x-coordinate
+            current_row.sort(key=lambda cell: cell[0])
+            rows.append(current_row)
+            current_row = [cell]
+            current_y = y
     
-    # Process in batches
-    if transactions_to_process:
-        batch_size = CONFIG['batch_size']
-        num_batches = len(transactions_to_process) // batch_size + (1 if len(transactions_to_process) % batch_size > 0 else 0)
-        
-        print(f"Processing {len(transactions_to_process)} transactions in {num_batches} batches...")
-        
-        start_time = time.time()
-        for batch_num in range(num_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(transactions_to_process))
-            batch = transactions_to_process[start_idx:end_idx]
+    # Add the last row
+    if current_row:
+        current_row.sort(key=lambda cell: cell[0])
+        rows.append(current_row)
+    
+    # Extract text from each cell and organize into a table
+    table_data = []
+    for row in rows:
+        row_data = []
+        for cell in row:
+            x, y, w, h = cell
+            # Use original image for better OCR results
+            cell_img = original_table_img[y:y+h, x:x+w]
             
-            print(f"Processing batch {batch_num+1}/{num_batches} ({len(batch)} transactions)...")
-            batch_results, batch_confidences = process_batch(batch, llm, cache)
-            
-            # Update results
-            category_dict.update(batch_results)
-            confidence_dict.update(batch_confidences)
-            
-            # Save cache periodically
-            if batch_num % 5 == 0:
-                save_cache(cache)
-                
-            # Sleep to avoid rate limiting
-            time.sleep(0.5)
-    
-    # Save final cache
-    save_cache(cache)
-   
-    # Create a copy of the input DataFrame with categories added
-    result_df = df.copy()
-    
-    # Apply categories to the DataFrame
-    result_df['Category'] = pd.Series(category_dict)
-    result_df['Confidence'] = pd.Series(confidence_dict)
-   
-    # Handle missing categories (should be rare)
-    result_df['Category'] = result_df['Category'].fillna("Miscellaneous")
-    result_df['Confidence'] = result_df['Confidence'].fillna(0.0)
-   
-    # Calculate processing statistics
-    if transactions_to_process:
-        end_time = time.time()
-        processing_time = end_time - start_time
-        print(f"Processing completed in {processing_time:.2f} seconds")
+            # OCR using EasyOCR
+            results = reader.readtext(cell_img)
+            cell_text = ' '.join([result[1] for result in results])
+            row_data.append(cell_text.strip())
         
-        # Calculate completion rate
-        high_conf = (result_df['Confidence'] >= CONFIG['min_confidence']).mean() * 100
-        print(f"High confidence categorizations: {high_conf:.1f}%")
-   
-    # Apply consistency checks (now with type awareness)
-    result_df = ensure_consistency(result_df)
+        # Only add non-empty rows
+        if any(cell.strip() for cell in row_data):
+            table_data.append(row_data)
     
-    return result_df, category_dict, confidence_dict
- 
-def apply_categories(df, category_dict, confidence_dict):
-    """Apply categorization results to the complete DataFrame
-   
-    Args:
-        df (pandas.DataFrame): Original DataFrame
-        category_dict (dict): Mapping from index to category
-        confidence_dict (dict): Mapping from index to confidence
-       
-    Returns:
-        pandas.DataFrame: DataFrame with categories added
-    """
-    # Create a copy to avoid modifying the original
-    categorized_df = df.copy()
-   
-    # Apply category and confidence to each row using index
-    categorized_df['Category'] = pd.Series(category_dict)
-    categorized_df['Confidence'] = pd.Series(confidence_dict)
-   
-    # Handle missing values
-    categorized_df['Category'] = categorized_df['Category'].fillna("Miscellaneous")
-    categorized_df['Confidence'] = categorized_df['Confidence'].fillna(0.0)
-   
-    # Apply consistency checks
-    categorized_df = ensure_consistency(categorized_df)
-   
-    return categorized_df
- 
-def ensure_consistency(df):
-    """Ensure consistency in categorization across similar transactions
-   
-    Args:
-        df (pandas.DataFrame): DataFrame with initial categorizations
-       
-    Returns:
-        pandas.DataFrame: DataFrame with consistent categorizations
-    """
-    # Group by normalized transaction text AND transaction type
-    normalized_map = {}
-    for idx, row in df.iterrows():
-        tx = row[CONFIG['transaction_column']]
-        tx_type = row[CONFIG['type_column']]
-        category = row['Category']
-        confidence = row['Confidence']
-       
-        if pd.isna(tx) or not tx:
-            continue
-           
-        normalized_tx = normalize_transaction(tx)
-        # Create composite key with transaction type
-        composite_key = f"{normalized_tx}|{tx_type}"
-       
-        if composite_key not in normalized_map:
-            normalized_map[composite_key] = []
-           
-        normalized_map[composite_key].append((idx, category, confidence))
-   
-    # Find best category for each normalized transaction + type combination
-    best_categories = {}
-    for composite_key, categories_data in normalized_map.items():
-        if len(categories_data) == 1:
-            best_categories[categories_data[0][0]] = categories_data[0][1]
-            continue
-           
-        # Count categories and weighted by confidence
-        category_scores = {}
-        for idx, category, confidence in categories_data:
-            if category not in category_scores:
-                category_scores[category] = 0
-            category_scores[category] += confidence
-           
-        # Get category with highest score
-        best_category = max(category_scores.items(), key=lambda x: x[1])[0]
+    # Create DataFrame
+    # First row may contain headers, but in case of partial detection, we'll use generic column names
+    if table_data:
+        # Check if all rows have the same number of columns
+        max_cols = max(len(row) for row in table_data)
+        for i in range(len(table_data)):
+            while len(table_data[i]) < max_cols:
+                table_data[i].append("")
+    
+        # Use first row as headers if it seems to contain header information
+        headers = []
+        if len(table_data) > 1:
+            potential_headers = table_data[0]
+            if all(isinstance(header, str) and header.strip() for header in potential_headers):
+                headers = potential_headers
+                table_data = table_data[1:]
+    
+        # If no valid headers are found, use generic column names
+        if not headers:
+            headers = [f"Column {i+1}" for i in range(max_cols)]
+    
+        df = pd.DataFrame(table_data, columns=headers)
         
-        # Apply to all indices in this group with low confidence
-        for idx, category, confidence in categories_data:
-            if confidence < CONFIG['min_confidence']:
-                best_categories[idx] = best_category
-   
-    # Apply consistency
-    consistent_df = df.copy()
-    for idx, category in best_categories.items():
-        # Only override if confidence is low
-        if consistent_df.loc[idx, 'Confidence'] < CONFIG['min_confidence']:
-            consistent_df.loc[idx, 'Category'] = category
-            # Increase confidence slightly but mark it as derived
-            consistent_df.loc[idx, 'Confidence'] = min(
-                CONFIG['min_confidence'],
-                consistent_df.loc[idx, 'Confidence'] + 0.1
-            )
-               
-    return consistent_df
+        # Save to CSV if output path is provided
+        if output_csv:
+            df.to_csv(output_csv, index=False)
+            print(f"Table data saved to {output_csv}")
+        
+        return df
+    else:
+        print("No table data detected.")
+        return None
+
+# Example usage
+if __name__ == "__main__":
+    image_path = "table_image.jpg"  # Replace with your image path
+    output_csv = "extracted_table.csv"  # Output CSV path
+    
+    df = extract_table_from_image(image_path, output_csv)
+    if df is not None:
+        print("\nExtracted Data Preview:")
+        print(df.head())
