@@ -1,46 +1,6 @@
-def detect_table_lines(img):
-    """
-    Detect horizontal and vertical lines in a table with improved filtering
-    """
-    # Enhanced binary image
-    binary = enhance_table_image(img)
-    
-    # Detect horizontal lines - increase kernel size for better line detection
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 1))
-    horizontal_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, horizontal_kernel)
-    
-    # Detect vertical lines - increase kernel size to reduce false detections
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 50))
-    vertical_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical_kernel)
-    
-    # Save for debugging
-    cv2.imwrite("horizontal_lines.jpg", horizontal_lines)
-    cv2.imwrite("vertical_lines.jpg", vertical_lines)
-    
-    # Combine lines
-    table_grid = cv2.add(horizontal_lines, vertical_lines)
-    cv2.imwrite("table_grid.jpg", table_grid)
-    
-    return table_grid, horizontal_lines, vertical_lines
-
-def filter_line_segments(segments, min_distance=20):
-    """
-    Filter line segments that are too close to each other
-    """
-    if not segments:
-        return []
-    
-    filtered = [segments[0]]
-    for i in range(1, len(segments)):
-        # Check if this segment is far enough from the last accepted segment
-        if segments[i] - filtered[-1] >= min_distance:
-            filtered.append(segments[i])
-    
-    return filtered
-
 def extract_table_from_image(image_path, output_csv=None):
     """
-    Main function to extract table from a rotated image with improved filtering
+    More reliable approach using direct grid-based cell extraction
     """
     print(f"Processing image: {image_path}")
     
@@ -48,87 +8,109 @@ def extract_table_from_image(image_path, output_csv=None):
     reader = easyocr.Reader(['en'])
     print("EasyOCR initialized")
     
-    # Deskew the image
-    rotated_img = deskew_image(image_path)
+    # Load image
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError(f"Could not read image from {image_path}")
     
-    try:
-        # Detect table grid
-        grid, h_lines, v_lines = detect_table_lines(rotated_img)
-        
-        # Find row and column boundaries
-        row_boundaries = find_horizontal_segments(h_lines)
-        col_boundaries = find_vertical_segments(v_lines)
-        
-        # Filter boundaries that are too close to each other
-        filtered_row_boundaries = filter_line_segments(row_boundaries, min_distance=15)
-        filtered_col_boundaries = filter_line_segments(col_boundaries, min_distance=15)
-        
-        print(f"Detected {len(row_boundaries)} rows and {len(col_boundaries)} columns")
-        print(f"After filtering: {len(filtered_row_boundaries)} rows and {len(filtered_col_boundaries)} columns")
-        
-        # Check if we have a reasonable number of columns (9 for your case)
-        # If not, try to force 9 columns by selecting the most prominent ones
-        expected_columns = 9
-        if len(filtered_col_boundaries) > expected_columns + 1:  # +1 because boundaries include start and end
-            print(f"Too many columns detected. Forcing {expected_columns} columns.")
-            # Get image width
-            img_width = rotated_img.shape[1]
-            # Create equidistant column boundaries
-            filtered_col_boundaries = [int(i * img_width / expected_columns) for i in range(expected_columns + 1)]
-        
-        if len(filtered_row_boundaries) < 2 or len(filtered_col_boundaries) < 2:
-            print("Insufficient grid lines detected, trying direct cell extraction")
-            cells = direct_cell_extraction(rotated_img)
-        else:
-            # Extract cells using filtered grid
-            cells = extract_cells(rotated_img, filtered_row_boundaries, filtered_col_boundaries)
-    except Exception as e:
-        print(f"Grid detection failed: {e}")
-        print("Falling back to direct cell extraction")
-        cells = direct_cell_extraction(rotated_img)
+    # Rotate 90 degrees if needed
+    rotated = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+    cv2.imwrite("rotated_image.jpg", rotated)
     
-    # If no cells were found, report failure
-    if not cells:
-        print("Failed to detect table structure")
-        return None
+    # Convert to grayscale
+    gray = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
     
-    print(f"Extracted {len(cells)} rows of cells")
+    # Apply preprocessing to enhance table structure
+    _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
     
-    # Extract text from cells
-    table_data = extract_text_from_cells(cells, reader)
+    # Filter out small noise
+    kernel = np.ones((2, 2), np.uint8)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+    cv2.imwrite("binary_table.jpg", binary)
     
-    # Filter out empty rows (rows where all cells are empty)
-    table_data = [row for row in table_data if any(cell.strip() for cell in row)]
+    # Get image dimensions
+    height, width = binary.shape[:2]
+    
+    # Define fixed grid for 9 columns
+    num_columns = 9
+    column_width = width // num_columns
+    
+    # Count number of rows using horizontal projection profile
+    row_projection = np.sum(binary, axis=1)
+    cv2.imwrite("row_projection.jpg", np.expand_dims(row_projection // 100, axis=1))
+    
+    # Find row boundaries using the projection profile
+    row_boundaries = []
+    in_row = False
+    threshold = width * 0.05  # 5% of width as threshold for detecting rows
+    
+    for i, projection in enumerate(row_projection):
+        if not in_row and projection > threshold:
+            # Start of a row
+            row_start = i
+            in_row = True
+        elif in_row and (projection <= threshold or i == height - 1):
+            # End of a row or end of image
+            row_end = i
+            if row_end - row_start > 10:  # Minimum row height
+                row_boundaries.append((row_start, row_end))
+            in_row = False
+    
+    print(f"Detected {len(row_boundaries)} rows")
+    
+    # Draw row boundaries on a copy for visualization
+    row_vis = rotated.copy()
+    for start, end in row_boundaries:
+        cv2.line(row_vis, (0, start), (width, start), (0, 255, 0), 2)
+        cv2.line(row_vis, (0, end), (width, end), (0, 0, 255), 2)
+    cv2.imwrite("row_boundaries.jpg", row_vis)
+    
+    # Define expected column headers
+    expected_headers = ["Sl. No", "State", "District", "Block", "Gram Panchayat", "Village", "Hamlet", "Habitation", "Remarks"]
+    
+    # Extract text from each cell in the grid
+    table_data = []
+    
+    for row_idx, (row_start, row_end) in enumerate(row_boundaries):
+        row_data = []
+        for col_idx in range(num_columns):
+            # Define cell boundaries
+            col_start = col_idx * column_width
+            col_end = (col_idx + 1) * column_width
+            
+            # Extract cell image
+            cell_img = rotated[row_start:row_end, col_start:col_end]
+            
+            # Save some cells for debugging
+            if row_idx < 3 and col_idx < 3:
+                cv2.imwrite(f"cell_{row_idx}_{col_idx}.jpg", cell_img)
+            
+            # Extract text using EasyOCR
+            try:
+                results = reader.readtext(cell_img)
+                cell_text = ' '.join([result[1] for result in results])
+                row_data.append(cell_text.strip())
+            except Exception as e:
+                print(f"Error in OCR for cell ({row_idx}, {col_idx}): {e}")
+                row_data.append("")
+        
+        # Only add rows with some content
+        if any(cell.strip() for cell in row_data):
+            table_data.append(row_data)
     
     # Create DataFrame
     if table_data:
-        # For your specific case with 9 columns
-        expected_headers = ["Sl. No", "State", "District", "Block", "Gram Panchayat", "Village", "Hamlet", "Habitation", "Remarks"]
+        # Create DataFrame with fixed columns
+        df = pd.DataFrame(table_data, columns=expected_headers)
         
-        # Get max columns from non-empty rows
-        max_cols = max(len(row) for row in table_data)
+        # Clean the data
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                df[col] = df[col].str.strip()
+                df[col] = df[col].str.replace(r'\s+', ' ', regex=True)
         
-        # Use expected headers if they fit
-        if len(expected_headers) <= max_cols:
-            column_names = expected_headers + [f"Column {i+1}" for i in range(len(expected_headers), max_cols)]
-        else:
-            column_names = expected_headers[:max_cols]
-        
-        # Ensure all rows have the same number of columns
-        for i in range(len(table_data)):
-            while len(table_data[i]) < max_cols:
-                table_data[i].append("")
-            if len(table_data[i]) > max_cols:
-                table_data[i] = table_data[i][:max_cols]
-        
-        # Create DataFrame
-        df = pd.DataFrame(table_data, columns=column_names)
-        
-        # Additional cleaning: Remove completely empty rows
-        df = df.dropna(how='all')
-        
-        # Remove rows where all cells contain empty string
-        df = df[df.apply(lambda x: x.astype(str).str.strip().str.len() > 0).any(axis=1)]
+        # Remove rows where all entries are empty or very short
+        df = df[df.astype(str).apply(lambda x: x.str.strip().str.len() > 2).any(axis=1)]
         
         # Save to CSV
         if output_csv:
