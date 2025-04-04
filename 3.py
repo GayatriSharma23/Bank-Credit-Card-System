@@ -1,123 +1,37 @@
-def extract_table_from_image(image_path, output_csv=None):
+def optimize_column_widths(binary_image, num_columns=9):
     """
-    More reliable approach using direct grid-based cell extraction
+    Optimize column widths by analyzing vertical projection profile
     """
-    print(f"Processing image: {image_path}")
+    # Calculate vertical projection profile
+    col_projection = np.sum(binary_image, axis=0)
     
-    # Initialize EasyOCR
-    reader = easyocr.Reader(['en'])
-    print("EasyOCR initialized")
+    # Visualize the projection
+    projection_vis = np.zeros((300, len(col_projection)), dtype=np.uint8)
+    for i, val in enumerate(col_projection):
+        normalized_val = min(int(val / 10), 299)
+        cv2.line(projection_vis, (i, 299), (i, 299-normalized_val), 255, 1)
+    cv2.imwrite("column_projection.jpg", projection_vis)
     
-    # Load image
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Could not read image from {image_path}")
+    # Find local minima in the projection profile
+    column_separators = []
+    window_size = len(col_projection) // (num_columns * 2)
+    for i in range(window_size, len(col_projection) - window_size):
+        left_max = max(col_projection[i-window_size:i])
+        right_max = max(col_projection[i+1:i+window_size+1])
+        if col_projection[i] < left_max * 0.6 and col_projection[i] < right_max * 0.6:
+            column_separators.append(i)
     
-    # Rotate 90 degrees if needed
-    rotated = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-    cv2.imwrite("rotated_image.jpg", rotated)
+    # If we find more separators than needed, select the ones with lowest values
+    if len(column_separators) > num_columns - 1:
+        # Get the values at separator positions
+        separator_values = [(sep, col_projection[sep]) for sep in column_separators]
+        # Sort by projection value (ascending)
+        separator_values.sort(key=lambda x: x[1])
+        # Take the num_columns-1 separators with lowest values
+        column_separators = [sep for sep, _ in separator_values[:num_columns-1]]
+        column_separators.sort()
     
-    # Convert to grayscale
-    gray = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
+    # Add start and end boundaries
+    column_boundaries = [0] + column_separators + [len(col_projection)]
     
-    # Apply preprocessing to enhance table structure
-    _, binary = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
-    
-    # Filter out small noise
-    kernel = np.ones((2, 2), np.uint8)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
-    cv2.imwrite("binary_table.jpg", binary)
-    
-    # Get image dimensions
-    height, width = binary.shape[:2]
-    
-    # Define fixed grid for 9 columns
-    num_columns = 9
-    column_width = width // num_columns
-    
-    # Count number of rows using horizontal projection profile
-    row_projection = np.sum(binary, axis=1)
-    cv2.imwrite("row_projection.jpg", np.expand_dims(row_projection // 100, axis=1))
-    
-    # Find row boundaries using the projection profile
-    row_boundaries = []
-    in_row = False
-    threshold = width * 0.05  # 5% of width as threshold for detecting rows
-    
-    for i, projection in enumerate(row_projection):
-        if not in_row and projection > threshold:
-            # Start of a row
-            row_start = i
-            in_row = True
-        elif in_row and (projection <= threshold or i == height - 1):
-            # End of a row or end of image
-            row_end = i
-            if row_end - row_start > 10:  # Minimum row height
-                row_boundaries.append((row_start, row_end))
-            in_row = False
-    
-    print(f"Detected {len(row_boundaries)} rows")
-    
-    # Draw row boundaries on a copy for visualization
-    row_vis = rotated.copy()
-    for start, end in row_boundaries:
-        cv2.line(row_vis, (0, start), (width, start), (0, 255, 0), 2)
-        cv2.line(row_vis, (0, end), (width, end), (0, 0, 255), 2)
-    cv2.imwrite("row_boundaries.jpg", row_vis)
-    
-    # Define expected column headers
-    expected_headers = ["Sl. No", "State", "District", "Block", "Gram Panchayat", "Village", "Hamlet", "Habitation", "Remarks"]
-    
-    # Extract text from each cell in the grid
-    table_data = []
-    
-    for row_idx, (row_start, row_end) in enumerate(row_boundaries):
-        row_data = []
-        for col_idx in range(num_columns):
-            # Define cell boundaries
-            col_start = col_idx * column_width
-            col_end = (col_idx + 1) * column_width
-            
-            # Extract cell image
-            cell_img = rotated[row_start:row_end, col_start:col_end]
-            
-            # Save some cells for debugging
-            if row_idx < 3 and col_idx < 3:
-                cv2.imwrite(f"cell_{row_idx}_{col_idx}.jpg", cell_img)
-            
-            # Extract text using EasyOCR
-            try:
-                results = reader.readtext(cell_img)
-                cell_text = ' '.join([result[1] for result in results])
-                row_data.append(cell_text.strip())
-            except Exception as e:
-                print(f"Error in OCR for cell ({row_idx}, {col_idx}): {e}")
-                row_data.append("")
-        
-        # Only add rows with some content
-        if any(cell.strip() for cell in row_data):
-            table_data.append(row_data)
-    
-    # Create DataFrame
-    if table_data:
-        # Create DataFrame with fixed columns
-        df = pd.DataFrame(table_data, columns=expected_headers)
-        
-        # Clean the data
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                df[col] = df[col].str.strip()
-                df[col] = df[col].str.replace(r'\s+', ' ', regex=True)
-        
-        # Remove rows where all entries are empty or very short
-        df = df[df.astype(str).apply(lambda x: x.str.strip().str.len() > 2).any(axis=1)]
-        
-        # Save to CSV
-        if output_csv:
-            df.to_csv(output_csv, index=False)
-            print(f"Table data saved to {output_csv}")
-        
-        return df
-    else:
-        print("No valid table data extracted")
-        return None
+    return column_boundaries
