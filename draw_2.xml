@@ -1,0 +1,142 @@
+<mxfile host="app.diagrams.net" modified="2023-09-17T11:55:00.000Z" agent="5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36" etag="q5lD-7b_fB_9lqCq_B_n" version="22.1.0" type="browser">
+  <diagram id="VzCjR_zXhU_Gk_8yFv_f" name="Page-1">
+    <mxGraphModel dx="1242" dy="782" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="720" y="40" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="440" y="100" as="sourcePoint"/>
+            <mxPoint x="440" y="150" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="5" value="&lt;font style=&quot;font-size: 14px&quot;&gt;Age-Gender Module&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/32/32441.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="270" y="260" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" value="&lt;font style=&quot;font-size: 14px&quot;&gt;Heart Rate Module&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/1034/1034233.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="490" y="260" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="330" y="340" as="sourcePoint"/>
+            <mxPoint x="330" y="400" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="550" y="340" as="sourcePoint"/>
+            <mxPoint x="550" y="400" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="9" value="&lt;font style=&quot;font-size: 14px&quot;&gt;BVP &amp; FS Outputs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/1063/1063229.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="490" y="400" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="550" y="480" as="sourcePoint"/>
+            <mxPoint x="550" y="540" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="11" value="&lt;font style=&quot;font-size: 14px&quot;&gt;BP Estimation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/7504/7504388.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="490" y="540" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="550" y="620" as="sourcePoint"/>
+            <mxPoint x="440" y="700" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="550" y="660"/>
+              <mxPoint x="440" y="660"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="13" value="&lt;font style=&quot;font-size: 14px&quot;&gt;BMI Module&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/7221/7221532.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="720" y="150" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="780" y="230" as="sourcePoint"/>
+            <mxPoint x="780" y="320" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="780" y="280"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="15" value="&lt;font style=&quot;font-size: 14px&quot;&gt;Output JSON&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/2635/2635391.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="380" y="700" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="16" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="330" y="340" as="sourcePoint"/>
+            <mxPoint x="440" y="700" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="330" y="520"/>
+              <mxPoint x="270" y="520"/>
+              <mxPoint x="270" y="700"/>
+              <mxPoint x="330" y="700"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="17" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="780" y="230" as="sourcePoint"/>
+            <mxPoint x="440" y="700" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="780" y="520"/>
+              <mxPoint x="670" y="520"/>
+              <mxPoint x="670" y="700"/>
+              <mxPoint x="440" y="700"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="18" value="&lt;font style=&quot;font-size: 14px&quot;&gt;Input Video&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/2870/2870349.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="19" value="&lt;font style=&quot;font-size: 14px&quot;&gt;Input Image&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/3228/3228383.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="720" y="40" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" value="&lt;font style=&quot;font-size: 14px&quot;&gt;Preprocessing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalLabelPosition=bottom;verticalAlign=top;labelBackgroundColor=#ffffff;image=https://cdn-icons-png.flaticon.com/512/2555/2555018.png;imageWidth=40;imageHeight=40;" vertex="1" parent="1">
+          <mxGeometry x="380" y="150" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="440" y="230" as="sourcePoint"/>
+            <mxPoint x="330" y="260" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="440" y="245"/>
+              <mxPoint x="330" y="245"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="22" value="" style="endArrow=classic;html=1;rounded=0;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="440" y="230" as="sourcePoint"/>
+            <mxPoint x="550" y="260" as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="440" y="245"/>
+              <mxPoint x="550" y="245"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="23" value="Parallel" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="410" y="230" width="60" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" value="Pre-processing" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="410" y="130" width="100" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" value="Video Stream" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="400" y="80" width="90" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="26" value="Image Stream" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="740" y="80" width="90" height="30" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
