@@ -1,3 +1,7 @@
+import argparse
+import logging
+import os
+import json
 
 import cv2
 import torch
@@ -25,6 +29,17 @@ def get_parser():
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to MiVOLO checkpoint")
     parser.add_argument("--draw", action="store_true", default=False, help="Draw results on output video/images")
     parser.add_argument("--device", default="cuda", type=str, help="Device to use (cpu/cuda)")
+
+    # Optional flags
+    parser.add_argument(
+        "--with-persons", action="store_true", default=False,
+        help="If set model will run with persons, if available"
+    )
+    parser.add_argument(
+        "--disable-faces", action="store_true", default=False,
+        help="If set model will use only persons if available"
+    )
+
     return parser
 
 
@@ -59,15 +74,14 @@ def main():
             _logger.info(f"Saving result to {outfilename}..")
 
         frame_idx = 0
-        for (detected_objects_history, frame) in predictor.recognize_video(args.input):
-            # Extract age directly from detected_objects_history (matches overlay)
+        for detected_objects_history, frame in predictor.recognize_video(args.input):
+            # --- Capture age from face_tracker (matches overlay) ---
             age_for_frame = None
-            if isinstance(detected_objects_history, dict) and len(detected_objects_history) > 0:
-                # Take first face's age
-                for face_id, face_data in detected_objects_history.items():
-                    if face_data and len(face_data) > 0:
-                        age_for_frame = face_data[0][0]  # tuple (age, gender)
-                        break
+            if hasattr(predictor, "face_tracker") and len(predictor.face_tracker) > 0:
+                for face_id in predictor.face_tracker.keys():
+                    tracked_face = predictor.face_tracker[face_id]
+                    age_for_frame = getattr(tracked_face, "age", None)
+                    break  # take first face
 
             results.append({
                 "frame_idx": frame_idx,
