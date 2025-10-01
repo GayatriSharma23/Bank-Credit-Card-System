@@ -1,3 +1,4 @@
+
 import cv2
 import numpy as np
 from pyVHR.signals.video import Video
@@ -5,16 +6,18 @@ from pyVHR.methods.pos import POS
 import heartpy as hp
 
 def overlay_text(frame, text, pos=(30, 50)):
-    """Overlay text on video frame."""
     return cv2.putText(frame, text, pos, cv2.FONT_HERSHEY_SIMPLEX,
                        1, (0, 255, 0), 2, cv2.LINE_AA)
 
-def process_chunk(frames, fps):
-    """Run pyVHR on 10s chunk of frames and return HR."""
-    video = Video()
-    video.faces = np.array(frames)   # cropped faces assumed
-    video.setMask(typeROI='skin_fix', skinThresh_fix=[30, 50])
+def process_chunk(video_path, start_frame, end_frame):
+    """Run pyVHR on a video sub-segment and return HR."""
+    video = Video(video_path)               # init with file
+    video.getCroppedFaces(detector='mtcnn', extractor='skvideo')
 
+    # Restrict to chunk frames only
+    video.faces = video.faces[start_frame:end_frame]
+
+    video.setMask(typeROI='skin_fix', skinThresh_fix=[30, 50])
     params = {
         "video": video,
         "verb": 0,
@@ -36,46 +39,38 @@ def analyze_video_chunks(input_path, output_path, chunk_seconds=10):
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
     fourcc = cv2.VideoWriter_fourcc(*"XVID")
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     chunk_size = fps * chunk_seconds
-    buffer = []
-    last_hr = None
     frame_idx = 0
+    last_hr = None
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        buffer.append(frame)
-        frame_idx += 1
-
-        # Every 10s → process chunk with pyVHR
-        if frame_idx % chunk_size == 0:
+        # Every chunk boundary → compute HR
+        if frame_idx % chunk_size == 0 and frame_idx + chunk_size <= total_frames:
             try:
-                last_hr = process_chunk(buffer, fps)
+                last_hr = process_chunk(input_path, frame_idx, frame_idx + chunk_size)
+                print(f"[INFO] HR at {frame_idx/fps:.1f}s: {last_hr:.1f} bpm")
             except Exception as e:
                 print("[WARN] pyVHR failed:", e)
                 last_hr = None
-            buffer = []  # reset buffer
 
-        # Overlay HR (last computed value) on video
+        # Overlay last HR
         if last_hr is not None:
-            text = f"HR: {last_hr:.1f} bpm"
-            frame = overlay_text(frame, text, pos=(30, 50))
+            frame = overlay_text(frame, f"HR: {last_hr:.1f} bpm", pos=(30, 50))
         else:
             frame = overlay_text(frame, "HR: Processing...", pos=(30, 50))
 
         out.write(frame)
+        frame_idx += 1
 
     cap.release()
     out.release()
     cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    input_video = "input.mp4"
-    output_video = "output_hr_overlay.avi"
-    analyze_video_chunks(input_video, output_video, chunk_seconds=10)
