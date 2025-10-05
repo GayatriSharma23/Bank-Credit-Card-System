@@ -1,83 +1,98 @@
 
+import cv2
 import json
+import numpy as np
 
-# ------------------------
-# 1. Load JSONs
-# ------------------------
-with open("age_gender.json") as f:
-    age_json = json.load(f)
+# Load JSON
+with open("consolidated.json", "r") as f:
+    data = json.load(f)
 
-with open("pyvhr_chunk1.json") as f:
-    pyvhr_chunk1 = json.load(f)
-with open("pyvhr_chunk2.json") as f:
-    pyvhr_chunk2 = json.load(f)
-pyvhr_chunks = pyvhr_chunk1 + pyvhr_chunk2
+# Convert to dict by frame_idx
+overlay_dict = {item['frame_idx']: item for item in data}
 
-with open("bp_chunk1.json") as f:
-    bp_chunk1 = json.load(f)
-with open("bp_chunk2.json") as f:
-    bp_chunk2 = json.load(f)
-bp_chunks = bp_chunk1 + bp_chunk2
+# Input/output video
+video_path = "input_video.mp4"
+output_path = "output_overlay.mp4"
 
-# Static values
-BMI = 27.27
-Emotion = "Neutral"
+cap = cv2.VideoCapture(video_path)
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-# ------------------------
-# 2. Determine total frames
-# ------------------------
-total_frames = len(age_json)  # assuming age_json covers all frames
-consolidated = []
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-# ------------------------
-# 3. Map chunk values to each frame
-# ------------------------
-def get_chunk_value(frame_idx, chunks):
-    """Return chunk values for the given frame index"""
-    for chunk in chunks:
-        start, end = chunk["Frame_range"]
-        if start <= frame_idx < end:
-            return chunk
-    return None
+# Overlay function with semi-transparent panel
+def draw_overlay(frame, overlay):
+    # Panel size
+    panel_width = 300
+    panel_height = 250
+    x, y = 10, 10  # Top-left corner
 
-# ------------------------
-# 4. Build consolidated JSON frame by frame
-# ------------------------
-for frame_idx in range(total_frames):
-    frame_data = {}
-    frame_data["frame_idx"] = frame_idx
-    frame_data["Overlay"] = age_json[frame_idx]["Overlay"]  # list of persons
+    # Draw semi-transparent rectangle
+    overlay_panel = frame.copy()
+    cv2.rectangle(overlay_panel, (x, y), (x + panel_width, y + panel_height), (0, 0, 0), -1)
+    alpha = 0.6
+    frame = cv2.addWeighted(overlay_panel, alpha, frame, 1 - alpha, 0)
 
-    # pyVHR
-    pyvhr = get_chunk_value(frame_idx, pyvhr_chunks)
-    if pyvhr:
-        frame_data["BPM"] = pyvhr.get("Bpm", None)
-        frame_data["HRV_SDNN"] = pyvhr.get("Hrv_sdd", None)
-        frame_data["SPO2"] = pyvhr.get("spo2", None)
-        frame_data["Stress"] = pyvhr.get("stress_level", None)
-    else:
-        frame_data["BPM"] = None
-        frame_data["HRV_SDNN"] = None
-        frame_data["SPO2"] = None
-        frame_data["Stress"] = None
+    # Start text position inside panel
+    text_x, text_y = x + 10, y + 30
+    line_height = 28
 
-    # BP
-    bp = get_chunk_value(frame_idx, bp_chunks)
-    if bp:
-        frame_data["BP"] = {"Systolic": bp.get("sys_bp"), "Diastolic": bp.get("Dia_bp")}
-    else:
-        frame_data["BP"] = {"Systolic": None, "Diastolic": None}
+    # People info
+    for person in overlay.get("overlay", []):
+        text = f"Person {person['id']} | Age: {person['age']:.1f} | Gender: {person['gender'].capitalize()}"
+        cv2.putText(frame, text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+        text_y += line_height
 
-    # Static values
-    frame_data["BMI"] = BMI
-    frame_data["Emotion"] = Emotion
+    # Top-level metrics
+    bpm = overlay.get("BPM", None)
+    hrv = overlay.get("HRV_SDNN", None)
+    stress = overlay.get("Stress", None)
 
-    consolidated.append(frame_data)
+    if bpm is not None:
+        cv2.putText(frame, f"BPM: {bpm:.1f}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+        text_y += line_height
+    if hrv is not None:
+        cv2.putText(frame, f"HRV SDNN: {hrv:.1f}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2, cv2.LINE_AA)
+        text_y += line_height
+    if stress:
+        cv2.putText(frame, f"Stress: {stress}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+        text_y += line_height
 
-# ------------------------
-# 5. Save consolidated JSON
-# ------------------------
-with open("consolidated.json", "w") as f:
-    json.dump(consolidated, f, indent=2)
+    # BP / BMI / Emotion
+    bp = overlay.get("BP", {})
+    systolic = bp.get("Systolic", None)
+    diastolic = bp.get("Diastolic", None)
+    bmi = bp.get("BMI", None)
+    emotion = bp.get("Emotion", None)
 
-print(f"✅ Consolidated JSON saved with {total_frames} frames.")
+    if systolic and diastolic:
+        cv2.putText(frame, f"BP: {systolic:.1f}/{diastolic:.1f}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2, cv2.LINE_AA)
+        text_y += line_height
+    if bmi:
+        cv2.putText(frame, f"BMI: {bmi:.1f}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 200), 2, cv2.LINE_AA)
+        text_y += line_height
+    if emotion:
+        cv2.putText(frame, f"Emotion: {emotion}", (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 200), 2, cv2.LINE_AA)
+        text_y += line_height
+
+    return frame
+
+# Process video frame by frame
+frame_idx = 0
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    if frame_idx in overlay_dict:
+        frame = draw_overlay(frame, overlay_dict[frame_idx])
+
+    out.write(frame)
+    frame_idx += 1
+
+cap.release()
+out.release()
+cv2.destroyAllWindows()
+print("Overlay video saved successfully!")
