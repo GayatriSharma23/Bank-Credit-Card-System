@@ -2,18 +2,19 @@
 import cv2
 import json
 import numpy as np
-import os
 
-def draw_overlay(frame, data, frame_idx, text_color=(255, 255, 255)):
+def draw_health_box(frame, data, frame_idx, text_color=(255, 255, 255)):
     """
-    Draws a professional translucent health overlay on the given video frame.
+    Draw fixed professional health overlay box
     """
     frame_copy = frame.copy()
+    
+    # Align frame index (adjust if JSON is 1-indexed)
     overlay_data = data.get(str(frame_idx))
     if overlay_data is None:
         return frame_copy
 
-    # Extract parameters
+    # Extract metrics
     bpm = overlay_data.get("BPM")
     hrv = overlay_data.get("HRV_SDNN")
     stress = overlay_data.get("Stress", "")
@@ -23,7 +24,6 @@ def draw_overlay(frame, data, frame_idx, text_color=(255, 255, 255)):
     systolic = bp.get("Systolic")
     diastolic = bp.get("Diastolic")
 
-    # Age & Gender
     person_data = overlay_data.get("overlay", [])
     if person_data:
         age = person_data[0].get("age", "")
@@ -31,21 +31,22 @@ def draw_overlay(frame, data, frame_idx, text_color=(255, 255, 255)):
     else:
         age, gender = "", ""
 
-    # Create translucent background box
+    # Translucent box
+    box_x, box_y, box_w, box_h = 20, 20, 350, 190
     overlay = frame.copy()
-    box_x, box_y, box_w, box_h = 20, 20, 310, 170
     cv2.rectangle(overlay, (box_x, box_y), (box_x + box_w, box_y + box_h), (0, 0, 0), -1)
     frame_copy = cv2.addWeighted(overlay, 0.45, frame_copy, 0.55, 0)
 
-    # Text lines with proper units
+    # Prepare lines
     lines = [
-        f"Age: {age:.1f} Y | {gender}" if age else "",
+        f"Frame: {frame_idx}",
+        f"Age: {age} Y | {gender}" if age else "",
         f"BPM: {bpm:.1f} beats/min" if bpm else "",
         f"HRV SDNN: {hrv:.1f} ms" if hrv else "",
-        f"BP: {systolic:.1f}/{diastolic:.1f} mmHg" if systolic and diastolic else "",
+        f"BP: {systolic}/{diastolic} mmHg" if systolic and diastolic else "",
         f"BMI: {bmi:.1f} kg/m²" if bmi else "",
-        f"Stress: {stress}",
-        f"Emotion: {emotion}"
+        f"Stress: {stress}" if stress else "",
+        f"Emotion: {emotion}" if emotion else ""
     ]
 
     # Draw text
@@ -59,19 +60,39 @@ def draw_overlay(frame, data, frame_idx, text_color=(255, 255, 255)):
     return frame_copy
 
 
+def draw_face_box(frame, face_coords, age=None, gender=None, text_color=(0, 0, 0)):
+    """
+    Draw dynamic face box with age & gender
+    """
+    x, y, w, h = face_coords
+    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    text = ""
+    if age:
+        text += f"Age: {age} "
+    if gender:
+        text += f"| {gender}"
+
+    if text:
+        # Text background
+        (text_width, text_height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+        cv2.rectangle(frame, (x, y - 20), (x + text_width + 10, y), (0, 255, 0), -1)
+        cv2.putText(frame, text, (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+
+    return frame
+
+
 def main(video_path, json_path, output_path):
-    """
-    Main function to overlay health info on a video based on consolidated JSON.
-    """
     # Load JSON
     with open(json_path, "r") as f:
         json_data = json.load(f)
 
-    # If list, convert to dict by frame index
+    # Convert JSON to dict if it’s a list
     if isinstance(json_data, list):
         data_dict = {str(item["frame_idx"]): item for item in json_data}
     else:
-        data_dict = json_data
+        # Adjust keys if needed (1-indexed → 0-indexed)
+        data_dict = {str(int(k)-1): v for k, v in json_data.items()}
 
     # Open video
     cap = cv2.VideoCapture(video_path)
@@ -79,15 +100,15 @@ def main(video_path, json_path, output_path):
         print("Error: Unable to open video file.")
         return
 
-    # Video writer setup
+    # Video writer
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-    print(f"Processing video: {video_path}")
-    print(f"Total frames: {int(cap.get(cv2.CAP_PROP_FRAME_COUNT))}")
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"Processing {total_frames} frames...")
 
     frame_idx = 0
     while True:
@@ -95,13 +116,21 @@ def main(video_path, json_path, output_path):
         if not ret:
             break
 
-        # Apply overlay
-        frame_with_overlay = draw_overlay(frame, data_dict, frame_idx)
-        out.write(frame_with_overlay)
+        # Overlay health metrics
+        frame = draw_health_box(frame, data_dict, frame_idx)
 
-        # Show progress
+        # Overlay face boxes if present
+        face_data = data_dict.get(str(frame_idx), {}).get("face", [])
+        for face in face_data:
+            x, y, w, h = face.get("bbox", (0, 0, 0, 0))
+            age = face.get("age")
+            gender = face.get("gender")
+            frame = draw_face_box(frame, (x, y, w, h), age, gender)
+
+        out.write(frame)
+
         if frame_idx % 50 == 0:
-            print(f"Processed frame {frame_idx}")
+            print(f"Processed frame {frame_idx}/{total_frames}")
 
         frame_idx += 1
 
@@ -111,9 +140,7 @@ def main(video_path, json_path, output_path):
 
 
 if __name__ == "__main__":
-    # ---- USER INPUT SECTION ----
-    video_path = "input_video.mp4"           # your original video
-    json_path = "consolidated_output.json"   # your JSON with frame-wise data
-    output_path = "video_with_overlay.mp4"   # output video with overlay
-
+    video_path = "input_video.mp4"           # Original video
+    json_path = "consolidated_output.json"   # JSON with per-frame health & face data
+    output_path = "video_with_overlay.mp4"   # Output video
     main(video_path, json_path, output_path)
